@@ -1,0 +1,839 @@
+---
+title: "sog_model"
+output: html_document
+date: "2025-09-26"
+---
+
+```{r setup, include=FALSE, warning=F, message=F}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(nhlscraper)
+library(cluster)
+library(MASS)
+library(caret)
+library(Metrics)
+library(glmnet)
+library(lme4)
+library(gt)
+load('train_data.RData')
+train_data <- as.data.frame(train_data)
+```
+
+
+
+# Creating Team Schedule Dataframe
+```{r}
+get_team_schedule_df <- function(team_tricode, date, season = 20252026) {
+  date <- as.Date(date)
+  sched <- get_team_schedule(team = toupper(team_tricode), season = season) %>%
+    dplyr::filter(gameType == 2) %>%
+    dplyr::filter(as.Date(gameDate) < date) %>%
+    dplyr::select(all_of(c("id", "gameDate", "startTimeUTC", "venueUTCOffset",
+                    "awayTeam.id", "awayTeam.abbrev", "awayTeam.score",
+                    "homeTeam.id", "homeTeam.abbrev", "homeTeam.score",
+                    "gameOutcome.lastPeriodType")))
+  return(sched)
+}
+
+# Example
+sched_sjs <- get_team_schedule_df("SJS", Sys.Date())
+sched_sjs
+```
+
+
+# Picking Team
+```{r}
+teams <- get_teams() %>%
+  dplyr::select('id', 'fullName', 'triCode')
+#teams
+
+
+get_team_id <- function(tricode) {
+  id <- teams %>%
+    dplyr::filter(triCode == toupper(tricode))
+  id <- id$id
+  if(length(id)>1)
+    id <- 68
+  return(id)
+}
+team_id <- get_team_id('edm')
+team_id
+```
+
+
+
+# Creating Game Shot Reports
+```{r}
+get_game_shot_report <- function(game_id, team_id) {
+  pbp <- get_gc_play_by_play(game_id)
+  #head(pbp, 50)
+  #colnames(pbp)
+  if (nrow(pbp) == 0 || !"typeCode" %in% names(pbp)) {
+    return(
+      tibble(
+        total_shot_attempts = NA_real_,
+        shots_on_goal_plus_goals = NA_real_,
+        blocked_shots = NA_real_,
+        missed_shots = NA_real_
+      )
+    )
+  }
+  shot_codes <- c(505, 506, 507, 508)
+  ## 505-goal, 506-shot on goal, 507-missed shot, 508-blocked shot
+  shot_pbp <- pbp %>%
+    dplyr::filter(typeCode %in% shot_codes)
+  shot_pbp <- shot_pbp %>%
+    dplyr::select(any_of(c('typeCode', 'sortOrder', 'periodDescriptor.number', 
+           'details.eventOwnerTeamId', 'details.shotType', 'details.homeScore', 'details.awayScore'))) %>%
+    dplyr::filter(details.eventOwnerTeamId == team_id) %>%
+    dplyr::filter(periodDescriptor.number %in% c(1,2,3,4))
+  #print(shot_pbp$details.eventOwnerTeamId)
+  #return(shot_pbp)
+  shot_report <- shot_pbp %>%
+    mutate(
+      total_attempt = 1L,
+      sog_or_goal = if_else(typeCode %in% c(505, 506), 1L, 0L),
+      blocked = if_else(typeCode == 508, 1L, 0L),
+      missed = if_else(typeCode == 507, 1L, 0L)
+    ) %>%
+    summarise(
+      total_shot_attempts = sum(total_attempt, na.rm = TRUE),
+      shots_on_goal_plus_goals = sum(sog_or_goal, na.rm = TRUE),
+      blocked_shots = sum(blocked, na.rm = TRUE),
+      missed_shots = sum(missed, na.rm = TRUE),
+      .groups = "drop"
+    )
+  return(shot_report)
+}
+
+gsr <- get_game_shot_report(2025020017, 52)
+gsr
+```
+
+# Creating Home/Away Splits
+```{r}
+get_away_splits <- function(team_tricode, date){
+  team_id <- get_team_id(tricode = toupper(team_tricode))
+  #return(team_id)
+  
+  away_sched <- get_team_schedule_df(team = toupper(team_tricode), date, season = 20252026) %>%
+    dplyr::filter(awayTeam.id == team_id) %>%
+    dplyr::select(all_of(c("id", "gameDate", "startTimeUTC", "venueUTCOffset",
+                    "awayTeam.id", "awayTeam.abbrev", "awayTeam.score",
+                    "homeTeam.id", "homeTeam.abbrev", "homeTeam.score",
+                    "gameOutcome.lastPeriodType")))
+  n_away <- nrow(away_sched)
+  
+  game_log <- data.frame(matrix(ncol=4, nrow=0))
+  cols <- c('total_shot_attempts', 'sog_plus_goals', 'blocked_shots', 'missed_shots')
+  colnames(game_log) <- cols
+  
+  for (i in 1:n_away){
+    game_id <- away_sched$id[nrow(away_sched)-(i-1)] 
+    #print(game_id)
+    
+    game_report <- get_game_shot_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  
+  away_mean_team_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(away_mean_team_log)
+}
+
+
+get_home_splits <- function(team_tricode, date){
+  team_id <- get_team_id(tricode = toupper(team_tricode))
+  #return(team_id)
+  
+  home_sched <- get_team_schedule_df(team = toupper(team_tricode), date, season = 20252026) %>%
+    dplyr::filter(homeTeam.id == team_id) %>%
+    dplyr::select(all_of(c("id", "gameDate", "startTimeUTC", "venueUTCOffset",
+                    "awayTeam.id", "awayTeam.abbrev", "awayTeam.score",
+                    "homeTeam.id", "homeTeam.abbrev", "homeTeam.score",
+                    "gameOutcome.lastPeriodType")))
+  n_home <- nrow(home_sched)
+  
+  game_log <- data.frame(matrix(ncol=4, nrow=0))
+  cols <- c('total_shot_attempts', 'sog_plus_goals', 'blocked_shots', 'missed_shots')
+  colnames(game_log) <- cols
+  dummy <- 0
+  for (i in 1:n_home){
+    #print(game_id)
+    game_id <- home_sched$id[nrow(home_sched)-(i-1)] 
+    game_report <- get_game_shot_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  
+  home_mean_team_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(home_mean_team_log)
+}
+
+today <- Sys.Date()
+get_away_splits('wsh', today)
+get_home_splits('wsh', today)
+```
+
+
+# Creating Shot Game Logs for Team
+```{r}
+get_team_shot_log <- function(team_tricode, n, date){
+  sched <- get_team_schedule_df(team_tricode, date, 20252026)
+  team_id <- get_team_id(team_tricode)
+  game_log <- data.frame(matrix(ncol=4, nrow=0))
+  cols <- c('total_shot_attempts', 'sog_plus_goals', 'blocked_shots', 'missed_shots')
+  colnames(game_log) <- cols
+  
+  #print(team_id)
+  for (i in 1:n){
+    game_id <- sched$id[nrow(sched)-(i-1)] 
+    #print(game_id)
+    
+    game_report <- get_game_shot_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  game_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(game_log)
+}
+
+today <- Sys.Date()
+l8_team_log <- get_team_shot_log('SJS', 8, today)
+l8_team_log
+
+l8_last <- get_team_shot_log('SJS', 8, '2025-10-26')
+l8_last
+```
+
+
+# Total Model Predictors Dataframe
+```{r}
+get_full_home_preds <- function(tricode, date){
+  l8_log <- get_team_shot_log(tricode, 8, date)
+  l4_log  <- get_team_shot_log(tricode, 4, date)
+  ha_split <- get_home_splits(tricode, date)
+  
+  l8_log <- l8_log %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+  l4_log <- l4_log %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+  ha_split <- ha_split %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+  
+  shot_preds <- cbind(l8_log, l4_log, ha_split)
+  return(shot_preds)
+}
+  
+
+get_full_away_preds <- function(tricode, date){
+  l8_log <- get_team_shot_log(tricode, 8, date) 
+  l4_log  <- get_team_shot_log(tricode, 4, date)
+  ha_split    <- get_away_splits(tricode, date)
+  
+  l8_log <- l8_log %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+  l4_log <- l4_log %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+  ha_split <- ha_split %>%
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+  
+  shot_preds <- cbind(l8_log, l4_log, ha_split)
+  return(shot_preds)
+}
+
+get_full_home_preds('SJS', today)
+get_full_home_preds('SJS', '2025-11-03')
+```
+
+
+# Getting Shots Against Splits
+```{r}
+# Shots-against ALLOWED per game for a team in a given game
+get_game_shot_allowed_report <- function(game_id, team_id) {
+  pbp <- get_gc_play_by_play(game_id)
+  shot_codes <- c(505, 506, 507, 508) # goal, shot on goal, missed, blocked
+  shot_pbp <- pbp %>%
+    dplyr::filter(typeCode %in% shot_codes) %>%
+    dplyr::select(any_of(c('typeCode', 'sortOrder', 'periodDescriptor.number',
+           'details.eventOwnerTeamId', 'details.shotType', 'details.homeScore', 'details.awayScore'))) %>%
+    dplyr::filter(details.eventOwnerTeamId != team_id) # events by the opponent → allowed by team_id
+  shot_report <- shot_pbp %>%
+    mutate(
+      total_attempt = 1L,
+      sog_or_goal = if_else(typeCode %in% c(505, 506), 1L, 0L),
+      blocked = if_else(typeCode == 508, 1L, 0L),
+      missed = if_else(typeCode == 507, 1L, 0L)
+    ) %>%
+    summarise(
+      total_shot_attempts = sum(total_attempt, na.rm = TRUE),
+      shots_on_goal_plus_goals = sum(sog_or_goal, na.rm = TRUE),
+      blocked_shots = sum(blocked, na.rm = TRUE),
+      missed_shots = sum(missed, na.rm = TRUE),
+      .groups = "drop"
+    )
+  return(shot_report)
+}
+
+# Last-N or full-season per-game shots-against allowed log for a team
+get_team_shot_allowed_log <- function(team_tricode, n, date) {
+  sched <- get_team_schedule_df(team = toupper(team_tricode), date, season = 20252026)
+  team_id <- get_team_id(tricode = toupper(team_tricode))
+  num_games <- nrow(sched)
+  game_log <- data.frame(matrix(ncol = 4, nrow = 0))
+  colnames(game_log) <- c('total_shot_attempts', 'shots_on_goal_plus_goals', 'blocked_shots', 'missed_shots')
+  for (i in 1:n) {
+    game_id <- sched$id[num_games - (i - 1)]
+    game_report <- get_game_shot_allowed_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  game_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(game_log)
+}
+
+
+# Venue splits (allowed)
+get_home_allowed_splits <- function(team_tricode, date) {
+  team_id <- get_team_id(tricode = toupper(team_tricode))
+  home_sched <- get_team_schedule_df(team = toupper(team_tricode), date, season = 20252026) %>%
+    dplyr::filter(homeTeam.id == team_id)
+  n_home <- nrow(home_sched)
+  game_log <- data.frame(matrix(ncol = 4, nrow = 0))
+  colnames(game_log) <- c('total_shot_attempts', 'shots_on_goal_plus_goals', 'blocked_shots', 'missed_shots')
+  for (i in 1:n_home) {
+    game_id <- home_sched$id[n_home - (i - 1)]
+    game_report <- get_game_shot_allowed_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  home_mean_allowed <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(home_mean_allowed)
+}
+
+get_away_allowed_splits <- function(team_tricode, date) {
+  team_id <- get_team_id(tricode = toupper(team_tricode))
+  away_sched <- get_team_schedule_df(team = toupper(team_tricode), date, season = 20252026) %>%
+    dplyr::filter(awayTeam.id == team_id)
+  n_away <- nrow(away_sched)
+  game_log <- data.frame(matrix(ncol = 4, nrow = 0))
+  colnames(game_log) <- c('total_shot_attempts', 'shots_on_goal_plus_goals', 'blocked_shots', 'missed_shots')
+  for (i in 1:n_away) {
+    game_id <- away_sched$id[n_away - (i - 1)]
+    game_report <- get_game_shot_allowed_report(game_id, team_id)
+    game_log <- rbind(game_log, game_report)
+  }
+  away_mean_allowed <- game_log %>% summarise(across(where(is.numeric), mean))
+  return(away_mean_allowed)
+}
+
+get_full_against_home_preds <- function(tricode, date){
+  l8_against <- get_team_shot_allowed_log(tricode, 8, date) 
+  l4_against  <- get_team_shot_allowed_log(tricode, 4, date) 
+  home_against <- get_home_allowed_splits(tricode, date)
+  
+  l8_against <- l8_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+  l4_against <- l4_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+  home_against <- home_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+  
+  shot_against_preds <- cbind(l8_against, l4_against, home_against)
+  return(shot_against_preds)
+}
+
+
+get_full_against_away_preds <- function(tricode, date){
+  l8_against <- get_team_shot_allowed_log(tricode, 8, date)
+  l4_against  <- get_team_shot_allowed_log(tricode, 4, date)
+  away_against <- get_away_allowed_splits(tricode, date)
+  
+  l8_against <- l8_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+  l4_against <- l4_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+  away_against <- away_against %>%
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+  
+  shot_against_preds <- cbind(l8_against, l4_against, away_against)
+  return(shot_against_preds)
+}
+
+get_full_against_home_preds('SJS', today)
+get_full_against_away_preds('SJS', '2025-11-03')
+
+get_game_shot_allowed_report(2025020534, 'edm')
+```
+
+
+# Getting Days of Rest
+```{r}
+get_rest <- function(game_id, team_tricode, max_rest = 7) {
+
+  sched <- get_team_schedule(team = toupper(team_tricode))
+
+  # Defensive check
+  if (!"gameDate" %in% names(sched) || !"id" %in% names(sched)) {
+    return(max_rest)
+  }
+
+  sched <- sched %>%
+    dplyr::mutate(gameDate = as.Date(gameDate)) %>%
+    dplyr::arrange(gameDate)
+
+  rownum <- which(sched$id == game_id)
+
+  # Game not found (future game, preseason mismatch, etc.)
+  if (length(rownum) == 0) {
+    last_game_date <- max(sched$gameDate, na.rm = TRUE)
+    return(min(as.numeric(Sys.Date() - last_game_date) - 1, max_rest))
+  }
+
+  # First game of season
+  if (rownum == 1) {
+    return(max_rest)
+  }
+
+  days_rest <- as.numeric(
+    sched$gameDate[rownum] - sched$gameDate[rownum - 1]
+  ) - 1
+
+  return(min(days_rest, max_rest))
+}
+
+get_rest(2025020534, 'edm')
+```
+
+
+
+# Getting Slate Data
+```{r, warning=F}
+get_daily_game_reports <- function(date) {
+  slate <- get_schedule(date = date) %>%
+    dplyr::select(c('id', 'gameType', 'startTimeUTC', 'awayTeam.id', 'awayTeam.abbrev',
+             'homeTeam.id', 'homeTeam.abbrev')) 
+  
+  df <- data.frame(game_id = slate[,1], team = slate[,5], opponent = slate[,7], ha = 'home')
+  names(df) <- c('game_id', 'team', 'opponent', 'h/a')
+  
+  df2 <- data.frame(game_id = slate[,1], team = slate[,7], opponent = slate[,5], ha='away')
+  names(df2) <- c('game_id', 'team', 'opponent', 'h/a')
+  games <- rbind(df, df2)
+  games[c('l8_sa', 'l8_sog', 'l8_miss', 'l4_sa', 'l4_sog', 'l4_miss', 'ha_sa', 'ha_sog', 'ha_miss',
+          'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 
+          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'rest_diff', 'true_sog')] <- NA
+  #return(games)
+  temp4 <- 0
+  for (i in 1:nrow(games)) {
+    if (games$'h/a'[i] == 'home'){
+      temp <- get_full_home_preds(games$team[i], date)
+      common_cols <- intersect(names(games[i,]), names(temp))
+      games[i, common_cols] <- temp[1, common_cols]
+      
+      temp2 <- get_full_against_away_preds(games$opponent[i], date)
+      common_cols_2 <- intersect(names(games[i,]), names(temp2))
+      games[i, common_cols_2] <- temp2[1, common_cols_2]
+      
+    }else if (games$'h/a'[i] == 'away'){
+      temp <- get_full_away_preds(games$team[i], date)
+      common_cols <- intersect(names(games[i,]), names(temp))
+      games[i, common_cols] <- temp[1, common_cols]
+      
+      temp2 <- get_full_against_home_preds(games$opponent[i], date)
+      common_cols_2 <- intersect(names(games[i,]), names(temp2))
+      games[i, common_cols_2] <- temp2[1, common_cols_2]
+    }
+    games$rest_diff[i] <- get_rest(games$game_id[i], games$team[i]) - get_rest(games$game_id[i], games$opponent[i])
+    if (date >= Sys.Date()){
+      tid <- get_team_id(games$team[i])
+      true_sog <- get_game_shot_report(games$game_id[i], tid)
+      games$true_sog[i] <- true_sog$shots_on_goal_plus_goals
+    }
+  }
+  return(games)
+}
+
+
+daily_reports <- get_daily_game_reports('2025-12-18')
+#daily_reports
+```
+
+
+# Creating Full Training Dataset
+```{r, warning=F}
+start_date <- as.Date('2025-12-17')
+end_date <- as.Date('2025-12-20')
+train <- data.frame()
+
+for(i in seq(start_date, end_date, by='day')){
+  temp3 <- get_daily_game_reports(as.Date(i))
+  #print(temp3)
+  train <- rbind(train, temp3)
+}
+train
+#train[,c('team', 'true_sog')]
+wk9 <- train
+
+
+train_data <- rbind(wk1, wk2, wk3, wk4, wk5, wk6, wk7, wk8, wk9)
+train_data
+# Start Date - 2025-10-26
+# End Date - 2025-12-20
+
+train_data$sog_trend <- train_data$l4_sog - train_data$l8_sog
+train_data$sog_ag_trend <- train_data$l4_sog_ag - train_data$l8_sog_ag
+train_data$home <- ifelse(train_data$'h/a' == 'home', 1, 0)
+train_data$off_def_gap <- train_data$l8_sog - train_data$l8_sog_ag
+train_data$pace <- train_data$l8_sog + train_data$l8_sog_ag
+train_data$shot_perc <- train_data$l8_sog / train_data$l8_sa
+train_data$shot_perc_ag <- train_data$l8_sog_ag / train_data$l8_sa_ag
+train_data
+save(train_data, file="train_data.RData")
+
+red_train <- train_data %>% dplyr::select('game_id', 'team', 'opponent', 'l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'rest_diff', 'true_sog', 'sog_trend', 'sog_ag_trend', 'home', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+#head(red_train)
+```
+
+# PCA
+```{r}
+pca_subset <- train_data %>% dplyr::select(-c('game_id', 'team', 'opponent', 'h/a', 'l8_miss', 'l4_miss', 'ha_miss', 'l8_miss_ag', 'l4_miss_ag', 'ha_miss_ag'))
+
+prout <- prcomp(pca_subset, scale=T)
+prout$rotation
+biplot(prout, scale=0)
+
+prout$sdev
+prvar <- prout$sdev^2
+prvar
+
+pve <- prvar/sum(prvar)
+pve
+
+plot(cumsum(pve), xlab="Principal Component ", 
+     ylab=" Cumulative Proportion of Variance Explained ", ylim=c(0,1), type='b')
+```
+
+
+# Scaling
+```{r}
+num_vars <- c('l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'rest_diff', 'sog_trend', 'sog_ag_trend', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+set.seed(42)
+
+train_idx <- createDataPartition(red_train$true_sog, p=.8, list=F)
+
+train <- red_train[train_idx, ]
+test <- red_train[-train_idx, ]
+
+scaler <- preProcess(train[, num_vars], method=c('center', 'scale'))
+
+train_scaled <- train
+test_scaled <- test
+train_scaled[, num_vars] <- predict(scaler, train[, num_vars])
+test_scaled[, num_vars] <- predict(scaler, test[, num_vars])
+test_scaled2 <- test_scaled
+summary(train_scaled[,num_vars])
+
+```
+
+# Model V1
+```{r}
+nb_fit <- glm.nb(true_sog ~ l8_sog + sog_trend + l8_sog_ag + sog_ag_trend + rest_diff
+                 + shot_perc + shot_perc_ag + home, data=train_scaled)
+
+summary(nb_fit)
+nb_fit$theta
+
+
+x_train <- model.matrix(true_sog ~ l8_sog + sog_trend + l8_sog_ag + sog_ag_trend + rest_diff
+                 + shot_perc + shot_perc_ag + home, data=train_scaled)[,-1]
+y_train <- train_scaled$true_sog
+
+ridge_pois <- cv.glmnet(x_train, y_train, family='poisson', alpha=0)
+
+
+x_test <- model.matrix(
+  true_sog ~ l8_sog + sog_trend + l8_sog_ag + sog_ag_trend +
+             rest_diff + shot_perc + shot_perc_ag + home,
+  test_scaled
+)[, -1]
+
+test$pred_nb    <- predict(nb_fit, test_scaled, type = "response")
+test$pred_ridge <- predict(ridge_pois, x_test, s = "lambda.min", type = "response")
+
+Metrics::rmse(test$true_sog, test$pred_nb)
+Metrics::rmse(test$true_sog, test$pred_ridge)
+
+exp(coef(nb_fit))
+
+```
+
+
+# Model V2
+```{r}
+re_fit <- glm.nb(
+  true_sog ~ 
+    l8_sog + l8_sog_ag + sog_ag_trend +
+    shot_perc + shot_perc_ag + rest_diff + home +
+    factor(team) + factor(opponent),
+  data = train_scaled
+)
+summary(re_fit)
+```
+
+
+# Test Data (w/ team effects)
+```{r}
+test_scaled$pred_sog <- predict(re_fit, newdata=test_scaled, type='response')
+test_scaled$pred_sog
+
+rmse_val <- sqrt(mean((test_scaled$true_sog - test_scaled$pred_sog)^2))
+mae_val  <- mean(abs(test_scaled$true_sog - test_scaled$pred_sog))
+
+rmse_val
+mae_val
+
+
+baseline_pred <- mean(train_scaled$true_sog)
+
+rmse_baseline <- rmse(test_scaled$true_sog, baseline_pred)
+rmse_baseline
+
+mean(test_scaled$pred_sog - test_scaled$true_sog)
+
+plot(
+  test_scaled$true_sog,
+  test_scaled$pred_sog,
+  xlab = "Actual SOG",
+  ylab = "Predicted SOG"
+)
+abline(0, 1, col = "red")
+
+
+resid <- test_scaled$true_sog - test_scaled$pred_sog
+
+plot(
+  test_scaled$pred_sog,
+  resid,
+  xlab = "Predicted SOG",
+  ylab = "Residual"
+)
+abline(h = 0, col = "red")
+```
+
+# Test Data (w/o team effects)
+```{r}
+test_scaled2$pred_sog <- predict(nb_fit, newdata=test_scaled, type='response')
+test_scaled2$pred_sog
+
+rmse_val <- sqrt(mean((test_scaled2$true_sog - test_scaled2$pred_sog)^2))
+mae_val  <- mean(abs(test_scaled2$true_sog - test_scaled2$pred_sog))
+rmse_val
+mae_val
+
+
+baseline_pred <- mean(test_scaled2$true_sog)
+
+rmse_baseline <- rmse(test_scaled2$true_sog, baseline_pred)
+rmse_baseline
+
+resid2 <- test_scaled2$true_sog - test_scaled2$pred_sog
+
+plot(
+  test_scaled2$pred_sog,
+  resid2,
+  xlab = "Predicted SOG",
+  ylab = "Residual"
+)
+abline(h = 0, col = "red")
+```
+
+
+# Baseline
+```{r}
+baseline_pred <- rep(mean(train$true_sog), nrow(test))
+rmse_baseline <- rmse(test$true_sog, baseline_pred)
+mae_baseline  <- mae(test$true_sog, baseline_pred)
+rmse_baseline
+mae_baseline
+
+```
+
+# Model Save
+```{r}
+saveRDS(nb_fit, 'nb_sog_model.rds')
+saveRDS(scaler, "sog_scaler.rds")
+
+```
+
+
+# Creating Predictions
+```{r}
+daily_reports <- get_daily_game_reports('2026-01-28')
+daily_reports$sog_trend <- daily_reports$l4_sog - daily_reports$l8_sog
+daily_reports$sog_ag_trend <- daily_reports$l4_sog_ag - daily_reports$l8_sog_ag
+daily_reports$home <- ifelse(daily_reports$'h/a' == 'home', 1, 0)
+daily_reports$shot_perc <- daily_reports$l8_sog / daily_reports$l8_sa
+daily_reports$shot_perc_ag <- daily_reports$l8_sog_ag / daily_reports$l8_sa_ag
+daily_reports$pred_sog <- NA
+daily_report_red <- daily_reports %>% 
+  dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
+daily_report_red
+predictors <- c('l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag')
+
+saveRDS(df, 'daily_report_red.rds')
+
+req_vars <- scaler$method$center
+miss_vars <- setdiff(req_vars, names(daily_report_red))
+daily_report_red[miss_vars] <- 0
+
+daily_report_red_scaled <- daily_report_red
+daily_report_red_scaled[req_vars] <- predict(scaler, daily_report_red[req_vars])
+daily_report_red_scaled <- daily_report_red_scaled[c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog')]
+#daily_report_red_scaled
+
+daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
+daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
+daily_report_red_scaled[c('team', 'pred_sog')]
+
+```
+
+# Amplifier
+```{r}
+eta <- predict(nb_fit, daily_report_red_scaled, type='link')
+beta0 <- coef(nb_fit)[1]
+effects <- eta - beta0
+amp <- 2
+eta_amp <- beta0 + effects * amp
+daily_report_red_scaled$pred_sog <- exp(eta_amp)
+daily_report_red_scaled[c('team', 'pred_sog')]
+```
+
+
+
+# Recording Results
+```{r}
+jan23 <- daily_report_red_scaled
+saveRDS(jan23, 'jan23.rds')
+```
+
+
+# Amplifier + Quantiles
+```{r, warning=F}
+mean_sog <- mean(train_data$true_sog)
+spread_factor <- 1.2
+daily_report_red_scaled$pred_sog_wide <- round(mean_sog + 
+  (daily_report_red_scaled$pred_sog - mean_sog) * spread_factor, 1)
+
+mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
+theta <- nb_fit$theta
+
+set.seed(42)
+simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
+
+for(i in 1:length(mu_pred)){
+  simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=theta)
+}
+
+daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75), 1)
+daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25), 1)
+
+for(i in 1:nrow(daily_report_red_scaled)){
+  tid <- get_team_id(daily_report_red_scaled$team[i])
+  true_sog <- get_game_shot_report(daily_report_red_scaled$game_id[i], tid)
+  daily_report_red_scaled$true_sog[i] <- true_sog$shots_on_goal_plus_goals
+}
+
+daily_report_red_scaled[c('team', 'pred_sog', 'pred_sog_wide', 'ceiling_sog', 'floor_sog', 'true_sog')]
+  
+
+ggplot(daily_report_red_scaled, aes(y=reorder(team, true_sog))) + 
+  geom_segment(aes(x=true_sog, xend=pred_sog, yend=team)) + 
+  geom_point(aes(x=true_sog), color='red', size=5, shape=18) + 
+  geom_point(aes(x=pred_sog), color='orange', size=4) +
+  geom_point(aes(x=pred_sog_wide), color='blue', size=4) + 
+  geom_point(aes(x=ceiling_sog), color='green', size=2) +
+  geom_point(aes(x=floor_sog), color='green', size=2) +
+  theme_minimal() +
+  labs(y='predicted_sog')
+
+mean(daily_report_red_scaled$true_sog - daily_report_red_scaled$pred_sog)
+mean(daily_report_red_scaled$true_sog - daily_report_red_scaled$pred_sog_wide)
+median(daily_report_red_scaled$true_sog - daily_report_red_scaled$pred_sog)
+median(daily_report_red_scaled$true_sog - daily_report_red_scaled$pred_sog_wide)
+
+```
+
+# RUN ME
+```{r, warning=F}
+daily_reports <- get_daily_game_reports('2026-01-30')
+daily_reports$sog_trend <- daily_reports$l4_sog - daily_reports$l8_sog
+daily_reports$sog_ag_trend <- daily_reports$l4_sog_ag - daily_reports$l8_sog_ag
+daily_reports$home <- ifelse(daily_reports$'h/a' == 'home', 1, 0)
+daily_reports$shot_perc <- daily_reports$l8_sog / daily_reports$l8_sa
+daily_reports$shot_perc_ag <- daily_reports$l8_sog_ag / daily_reports$l8_sa_ag
+daily_reports$pred_sog <- NA
+daily_report_red <- daily_reports %>% 
+  dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
+predictors <- c('l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag')
+
+saveRDS(df, 'daily_report_red.rds')
+
+req_vars <- scaler$method$center
+miss_vars <- setdiff(req_vars, names(daily_report_red))
+daily_report_red[miss_vars] <- 0
+
+daily_report_red_scaled <- daily_report_red
+daily_report_red_scaled[req_vars] <- predict(scaler, daily_report_red[req_vars])
+daily_report_red_scaled <- daily_report_red_scaled[c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog')]
+
+daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
+daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
+
+
+mean_sog <- mean(train_data$true_sog)
+spread_factor <- 1.2
+daily_report_red_scaled$pred_sog_wide <- round(mean_sog + 
+  (daily_report_red_scaled$pred_sog - mean_sog) * spread_factor, 1)
+
+mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
+theta <- nb_fit$theta
+
+set.seed(42)
+simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
+
+for(i in 1:length(mu_pred)){
+  simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=theta)
+}
+
+daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75), 1)
+daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25), 1)
+
+for(i in 1:nrow(daily_report_red_scaled)){
+  tid <- get_team_id(daily_report_red_scaled$team[i])
+  true_sog <- get_game_shot_report(daily_report_red_scaled$game_id[i], tid)
+  daily_report_red_scaled$true_sog[i] <- true_sog$shots_on_goal_plus_goals
+}
+
+
+table_html <- daily_report_red_scaled %>%
+  dplyr::select('team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog', 'true_sog') %>%
+  gt() %>%
+  tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
+  cols_label(
+    'floor_sog' = "25th Percentile",
+    'pred_sog_wide' = "Predicted Mean",
+    'ceiling_sog' = "80th Percentile"
+  ) %>%
+  as_raw_html()
+table_html
+# Save as index.html for GitHub Pages
+writeLines(table_html, "index.html")
+```
