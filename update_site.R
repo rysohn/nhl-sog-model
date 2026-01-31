@@ -85,27 +85,39 @@ tryCatch({
   daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75), 1)
   daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25), 1)
 
+  daily_report_red_scaled <- daily_report_red_scaled %>%
+  mutate(
+    team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
+    logo_url = paste0("https://assets.nhle.com/logos/nhl/svg/", team_id, "_light.svg")
+  )
+
   # --- HTML OUTPUT ---
   # Note: I removed 'true_sog' from select() because games haven't happened yet
   table_html <- daily_report_red_scaled %>%
-    dplyr::select('team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
-    gt() %>%
-    tab_header(title = paste("NHL Shot Predictions:", today)) %>%
-    cols_label(
-      'floor_sog' = "25th Percentile",
-      'pred_sog_wide' = "Predicted Mean (Wide)",
-      'ceiling_sog' = "75th Percentile"
-    ) %>%
-    data_color(
-      columns = pred_sog_wide,
-      method = "numeric",
-      palette = "Reds"
-    ) %>%
-    as_raw_html()
+  dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
+  gt() %>%
+  # Transform the URL column into actual images
+  text_transform(
+    locations = cells_body(columns = logo_url),
+    fn = function(x) {
+      web_image(url = x, height = 30)
+    }
+  ) %>%
+  tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
+  cols_label(
+    'logo_url' = "", # Remove the header for the logo column
+    'team' = "Team",
+    'opponent' = "Opponent",
+    'floor_sog' = "25th Percentile",
+    'pred_sog_wide' = "Predicted Mean",
+    'ceiling_sog' = "75th Percentile"
+  ) %>%
+  # Align the logo and team name nicely
+  cols_align(align = "left", columns = c(logo_url, team)) %>%
+  as_raw_html()
 
-  # Save as index.html
-  writeLines(table_html, "index.html")
-  print("Success: index.html created.")
+# Save the updated file
+writeLines(table_html, "index.html")
 
 }, error = function(e) {
   print(paste("Error:", e$message))
