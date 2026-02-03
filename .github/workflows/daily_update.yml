@@ -23,18 +23,20 @@ jobs:
       - name: Install R packages
         run: |
           options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
-          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr2', 'jsonlite'))
+          # We include all dependencies here because the direct install method 
+          # won't automatically download them.
+          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 
+                             'lme4', 'cluster', 'Metrics', 'glmnet', 
+                             'httr2', 'jsonlite'))
         shell: Rscript {0}
 
-      - name: Install nhlscraper
+      - name: Install nhlscraper (Direct Download)
         run: |
-          # 1. Force the session to ignore any environmental tokens
-          Sys.setenv(GITHUB_PAT = "")
-          
-          # 2. Install using the 'remotes' package with auth_token set to NULL
-          remotes::install_github('RentoSaijo/nhlscraper', 
-                                  upgrade = "never", 
-                                  auth_token = NULL)
+          # This avoids the GitHub API and PAT/Credential checks entirely.
+          # It downloads the code directly as a compressed file.
+          install.packages("https://github.com/RentoSaijo/nhlscraper/archive/refs/heads/main.tar.gz", 
+                           repos = NULL, 
+                           type = "source")
         shell: Rscript {0}
 
       - name: Run Model
