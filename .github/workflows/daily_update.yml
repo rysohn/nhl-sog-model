@@ -28,6 +28,8 @@ jobs:
 
       - name: Install nhlscraper
         run: |
+          Sys.unsetenv("GITHUB_PAT")
+          Sys.unsetenv("GITHUB_TOKEN")
           # Download the package as a zip directly to bypass PAT/Credentials issues
           install.packages("https://github.com/yosefshuman/nhlscraper/archive/refs/heads/master.tar.gz", repos = NULL, type = "source")
         shell: Rscript {0}
