@@ -28,7 +28,13 @@ jobs:
 
       - name: Install nhlscraper
         run: |
-          remotes::install_github('RentoSaijo/nhlscraper', upgrade = "never")
+          # 1. Force the session to ignore any environmental tokens
+          Sys.setenv(GITHUB_PAT = "")
+          
+          # 2. Install using the 'remotes' package with auth_token set to NULL
+          remotes::install_github('RentoSaijo/nhlscraper', 
+                                  upgrade = "never", 
+                                  auth_token = NULL)
         shell: Rscript {0}
 
       - name: Run Model
