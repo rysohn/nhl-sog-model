@@ -28,9 +28,10 @@ jobs:
 
       - name: Install nhlscraper
         run: |
+          Sys.setenv(GITHUB_PAT = "")
           remotes::install_github('yosefshuman/nhlscraper', upgrade = "never", quiet = FALSE)
         shell: Rscript {0}
-        
+
       - name: Run Model
         run: Rscript update_site.R
 
