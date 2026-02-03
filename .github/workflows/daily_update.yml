@@ -28,10 +28,15 @@ jobs:
 
       - name: Install nhlscraper
         run: |
+          # 1. Unset the token so R doesn't try to use it
           Sys.unsetenv("GITHUB_PAT")
           Sys.unsetenv("GITHUB_TOKEN")
-          # Download the package as a zip directly to bypass PAT/Credentials issues
-          install.packages("https://github.com/yosefshuman/nhlscraper/archive/refs/heads/master.tar.gz", repos = NULL, type = "source")
+          
+          # 2. Force install with no auth token and no upgrades
+          remotes::install_github('yosefshuman/nhlscraper', 
+                                  upgrade = "never", 
+                                  auth_token = NULL,
+                                  quiet = FALSE)
         shell: Rscript {0}
 
       - name: Run Model
