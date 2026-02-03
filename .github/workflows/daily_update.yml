@@ -23,20 +23,15 @@ jobs:
       - name: Install R packages
         run: |
           options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
-          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet'))
+          # Added 'httr2' and 'jsonlite' to this list so nhlscraper has what it needs
+          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr2', 'jsonlite'))
         shell: Rscript {0}
 
       - name: Install nhlscraper
         run: |
-          # 1. Unset the token so R doesn't try to use it
-          Sys.unsetenv("GITHUB_PAT")
-          Sys.unsetenv("GITHUB_TOKEN")
-          
-          # 2. Force install with no auth token and no upgrades
-          remotes::install_github('yosefshuman/nhlscraper', 
-                                  upgrade = "never", 
-                                  auth_token = NULL,
-                                  quiet = FALSE)
+          # Use base R to install directly from the URL. 
+          # This bypasses the GitHub API entirely, avoiding the 401 error.
+          install.packages("https://github.com/yosefshuman/nhlscraper/archive/refs/heads/master.tar.gz", repos = NULL, type = "source")
         shell: Rscript {0}
 
       - name: Run Model
