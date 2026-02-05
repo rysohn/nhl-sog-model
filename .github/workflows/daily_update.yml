@@ -23,20 +23,14 @@ jobs:
       - name: Install R packages
         run: |
           options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
-          # We include all dependencies here because the direct install method 
-          # won't automatically download them.
-          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 
-                             'lme4', 'cluster', 'Metrics', 'glmnet', 
-                             'httr2', 'jsonlite'))
+          # Ensure 'remotes' is installed here
+          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr2', 'jsonlite'))
         shell: Rscript {0}
 
-      - name: Install nhlscraper (Direct Download)
+      - name: Install nhlscraper 0.2.0
         run: |
-          # This avoids the GitHub API and PAT/Credential checks entirely.
-          # It downloads the code directly as a compressed file.
-          install.packages("https://github.com/RentoSaijo/nhlscraper/archive/refs/heads/main.tar.gz", 
-                           repos = NULL, 
-                           type = "source")
+          # This pulls specifically version 0.2.0 from the CRAN archive
+          remotes::install_version("nhlscraper", version = "0.2.0", repos = "http://cran.us.r-project.org", upgrade = "never")
         shell: Rscript {0}
 
       - name: Run Model
