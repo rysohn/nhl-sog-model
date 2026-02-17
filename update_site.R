@@ -93,27 +93,36 @@ tryCatch({
   )
 
   # --- HTML OUTPUT ---
+  # 1. Define your target center
+  center_val <- 28.02844
+  
+  # 2. Calculate the maximum deviation from that center in today's data
+  # This ensures that 28.02844 is mathematically in the middle of the scale
+  max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
+  
+  # 3. Create a symmetric domain (e.g., if max diff is 5, domain is 23.02 to 33.02)
+  symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
+
+  # 4. Generate the Table
   table_html <- daily_report_red_scaled %>%
     dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
     gt() %>%
     
-    # 1. ADD CONDITIONAL FORMATTING (Red = Low, Green = High)
+    # Apply the Symmetric Color Scale
     data_color(
       columns = pred_sog_wide,
       method = "numeric",
-      palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Light Red -> White -> Light Green
-      domain = NULL # Auto-scales based on the min/max of the data
+      palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Red -> White -> Green
+      domain = symmetric_domain # Forces White to land exactly on 28.02844
     ) %>%
 
-    # 2. Transform the URL column into actual images
+    # ... (Rest of your text_transform, tab_header, etc. remains the same) ...
     text_transform(
       locations = cells_body(columns = logo_url),
       fn = function(x) {
         web_image(url = x, height = 30)
       }
     ) %>%
-    
-    # 3. Headers and Labels
     tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
     cols_label(
       'logo_url' = "", 
