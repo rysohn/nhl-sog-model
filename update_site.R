@@ -93,29 +93,38 @@ tryCatch({
   )
 
   # --- HTML OUTPUT ---
-  # Note: I removed 'true_sog' from select() because games haven't happened yet
   table_html <- daily_report_red_scaled %>%
-  dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
-  gt() %>%
-  # Transform the URL column into actual images
-  text_transform(
-    locations = cells_body(columns = logo_url),
-    fn = function(x) {
-      web_image(url = x, height = 30)
-    }
-  ) %>%
-  tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
-  cols_label(
-    'logo_url' = "", # Remove the header for the logo column
-    'team' = "Team",
-    'opponent' = "Opponent",
-    'floor_sog' = "25th Percentile",
-    'pred_sog_wide' = "Predicted Mean",
-    'ceiling_sog' = "75th Percentile"
-  ) %>%
-  # Align the logo and team name nicely
-  cols_align(align = "left", columns = c(logo_url, team)) %>%
-  as_raw_html()
+    dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
+    gt() %>%
+    
+    # 1. ADD CONDITIONAL FORMATTING (Red = Low, Green = High)
+    data_color(
+      columns = pred_sog_wide,
+      method = "numeric",
+      palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Light Red -> White -> Light Green
+      domain = NULL # Auto-scales based on the min/max of the data
+    ) %>%
+
+    # 2. Transform the URL column into actual images
+    text_transform(
+      locations = cells_body(columns = logo_url),
+      fn = function(x) {
+        web_image(url = x, height = 30)
+      }
+    ) %>%
+    
+    # 3. Headers and Labels
+    tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
+    cols_label(
+      'logo_url' = "", 
+      'team' = "Team",
+      'opponent' = "Opponent",
+      'floor_sog' = "25th Percentile",
+      'pred_sog_wide' = "Predicted Mean",
+      'ceiling_sog' = "75th Percentile"
+    ) %>%
+    cols_align(align = "left", columns = c(logo_url, team)) %>%
+    as_raw_html()
 
 # Save the updated file
 writeLines(table_html, "index.html")
