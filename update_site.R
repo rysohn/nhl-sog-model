@@ -17,7 +17,7 @@ if(file.exists("train_data.RData")) {
   mean_sog <- mean(train_data$true_sog, na.rm=TRUE)
 } else {
   # Fallback if file missing (Replace with your actual training mean)
-  mean_sog <- 30.0 
+  mean_sog <- 28.02844 
   warning("train_data.RData not found. Using default mean_sog = 30.0")
 }
 
@@ -144,7 +144,22 @@ tryCatch({
 
   # Save the updated file
     gtsave(table_html, 'index.html')
-  }else{
-  writeLines(paste("<div style='text-align:center; padding-top:100px; font-family:sans-serif;'><h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1><p style='font-size:20px;'>"), "index.html")
+  }else {
+    stop("No games scheduled today.") # Passes control to error handler
   }
+
+}, error = function(e) {
+  
+  # We print the REAL error to the console (for you to see in GitHub logs)
+  print(paste("Script stopped (Hidden from user):", e$message))
+  
+  # But we ALWAYS write the "No Games" message to the website
+  html_content <- paste0(
+    "<div style='text-align:center; padding-top:100px; font-family:sans-serif;'>",
+    "<h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1>",
+    "<p style='font-size:20px;'>Check back tomorrow!</p>",
+    "</div>"
+  )
+  
+  writeLines(html_content, "index.html")
 })
