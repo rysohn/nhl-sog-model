@@ -108,6 +108,14 @@ tryCatch({
     dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
     gt() %>%
     
+    opt_interactive(
+      active=TRUE,
+      use_sorting=TRUE,
+      use_search=TRUE,
+      use_filters=TRUE,
+      use_highlight=TRUE
+    )
+
     # Apply the Symmetric Color Scale
     data_color(
       columns = pred_sog_wide,
