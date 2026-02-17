@@ -89,7 +89,9 @@ tryCatch({
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
-    logo_url = paste0("https://assets.nhle.com/logos/nhl/svg/", daily_report_red_scaled$team, "_dark.svg")
+    logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
+      daily_report_red_scaled$team, 
+      "_dark.svg' style='height:35px; vertical-align:middle;'>")
   )
 
   # --- HTML OUTPUT ---
@@ -108,6 +110,8 @@ tryCatch({
     table_html <- daily_report_red_scaled %>%
       dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
       gt() %>%
+
+      fmt_markdown(columns = logo_url) %>% 
       
       opt_interactive(
         active=TRUE,
@@ -126,12 +130,6 @@ tryCatch({
         domain = symmetric_domain # Forces White to land exactly on 28.02844
       ) %>%
 
-      text_transform(
-        locations = cells_body(columns = logo_url),
-        fn = function(x) {
-          web_image(url = x, height = 30)
-        }
-      ) %>%
       tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
       cols_label(
         'logo_url' = "", 
