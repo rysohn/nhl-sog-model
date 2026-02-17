@@ -91,7 +91,7 @@ tryCatch({
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
       daily_report_red_scaled$team, 
-      "_dark.svg' style='height:35px; vertical-align:middle;'>")
+      "_light.svg' style='height:35px; vertical-align:middle;'>")
   )
 
   # --- HTML OUTPUT ---
@@ -138,7 +138,8 @@ tryCatch({
         'pred_sog_wide' = "Predicted Mean",
         'ceiling_sog' = "75th Percentile"
       ) %>%
-      cols_align(align = "left", columns = c(logo_url, team))
+      cols_align(align = "right", columns = logo_url) %>%
+      cols_align(align = "left", columns = team)
 
   # Save the updated file
     gtsave(table_html, 'index.html')
