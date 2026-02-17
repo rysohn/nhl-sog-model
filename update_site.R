@@ -93,60 +93,57 @@ tryCatch({
   )
 
   # --- HTML OUTPUT ---
-  # 1. Define your target center
-  center_val <- 28.02844
-  
-  # 2. Calculate the maximum deviation from that center in today's data
-  # This ensures that 28.02844 is mathematically in the middle of the scale
-  max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
-  
-  # 3. Create a symmetric domain (e.g., if max diff is 5, domain is 23.02 to 33.02)
-  symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
-
-  # 4. Generate the Table
-  table_html <- daily_report_red_scaled %>%
-    dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
-    gt() %>%
+  if(nrow(daily_report_red_scaled)>0){
+    # 1. Define your target center
+    center_val <- 28.02844
     
-    opt_interactive(
-      active=TRUE,
-      use_sorting=TRUE,
-      use_search=TRUE,
-      use_filters=TRUE,
-      use_highlight=TRUE
-    ) %>%
+    # 2. Calculate the maximum deviation from that center in today's data
+    # This ensures that 28.02844 is mathematically in the middle of the scale
+    max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
+    
+    # 3. Create a symmetric domain (e.g., if max diff is 5, domain is 23.02 to 33.02)
+    symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
 
-    # Apply the Symmetric Color Scale
-    data_color(
-      columns = pred_sog_wide,
-      method = "numeric",
-      palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Red -> White -> Green
-      domain = symmetric_domain # Forces White to land exactly on 28.02844
-    ) %>%
+    # 4. Generate the Table
+    table_html <- daily_report_red_scaled %>%
+      dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
+      gt() %>%
+      
+      opt_interactive(
+        active=TRUE,
+        use_sorting=TRUE,
+        use_search=TRUE,
+        use_filters=TRUE,
+        use_highlight=TRUE
+      ) %>%
 
-    # ... (Rest of your text_transform, tab_header, etc. remains the same) ...
-    text_transform(
-      locations = cells_body(columns = logo_url),
-      fn = function(x) {
-        web_image(url = x, height = 30)
-      }
-    ) %>%
-    tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
-    cols_label(
-      'logo_url' = "", 
-      'team' = "Team",
-      'opponent' = "Opponent",
-      'floor_sog' = "25th Percentile",
-      'pred_sog_wide' = "Predicted Mean",
-      'ceiling_sog' = "75th Percentile"
-    ) %>%
-    cols_align(align = "left", columns = c(logo_url, team)) %>%
-    as_raw_html()
+      # Apply the Symmetric Color Scale
+      data_color(
+        columns = pred_sog_wide,
+        method = "numeric",
+        palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Red -> White -> Green
+        domain = symmetric_domain # Forces White to land exactly on 28.02844
+      ) %>%
 
-# Save the updated file
-writeLines(table_html, "index.html")
+      text_transform(
+        locations = cells_body(columns = logo_url),
+        fn = function(x) {
+          web_image(url = x, height = 30)
+        }
+      ) %>%
+      tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
+      cols_label(
+        'logo_url' = "", 
+        'team' = "Team",
+        'opponent' = "Opponent",
+        'floor_sog' = "25th Percentile",
+        'pred_sog_wide' = "Predicted Mean",
+        'ceiling_sog' = "75th Percentile"
+      ) %>%
+      cols_align(align = "left", columns = c(logo_url, team))
 
-}, error = function(e) {
-  print(paste("Error:", e$message))
+  # Save the updated file
+    gtsave(table_html, 'index.html')
+  }else{
   writeLines(paste("<div style='text-align:center; padding-top:100px; font-family:sans-serif;'><h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1><p style='font-size:20px;'>"), "index.html")
 })
