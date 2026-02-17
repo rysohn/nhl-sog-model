@@ -22,7 +22,8 @@ if(file.exists("train_data.RData")) {
 }
 
 # 2. Get Today's Date
-today <- Sys.Date()
+today <- '2026-02-03'
+#today <- Sys.Date()
 print(paste("Running model for:", today))
 
 tryCatch({
@@ -121,5 +122,5 @@ writeLines(table_html, "index.html")
 
 }, error = function(e) {
   print(paste("Error:", e$message))
-  writeLines(paste("<h3>No Games or Error</h3><p>"), "index.html")
+  writeLines(paste("<div style='text-align:center; padding-top:100px; font-family:sans-serif;'><h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1><p style='font-size:20px;'>"), "index.html")
 })
