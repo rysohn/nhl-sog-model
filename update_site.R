@@ -114,7 +114,7 @@ tryCatch({
       use_search=TRUE,
       use_filters=TRUE,
       use_highlight=TRUE
-    )
+    ) %>%
 
     # Apply the Symmetric Color Scale
     data_color(
