@@ -121,5 +121,5 @@ writeLines(table_html, "index.html")
 
 }, error = function(e) {
   print(paste("Error:", e$message))
-  writeLines(paste("<h3>No Games or Error</h3><p>", e$message, "</p>"), "index.html")
+  writeLines(paste("<h3>No Games or Error</h3><p>"), "index.html")
 })
