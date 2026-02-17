@@ -18,7 +18,7 @@ if(file.exists("train_data.RData")) {
 } else {
   # Fallback if file missing (Replace with your actual training mean)
   mean_sog <- 28.02844 
-  warning("train_data.RData not found. Using default mean_sog = 30.0")
+  warning("train_data.RData not found. Using default mean_sog = 28.03")
 }
 
 # 2. Get Today's Date
@@ -89,7 +89,7 @@ tryCatch({
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
-    logo_url = paste0("https://assets.nhle.com/logos/nhl/svg/", team_id, "_light.svg")
+    logo_url = paste0("https://assets.nhle.com/logos/nhl/svg/", daily_report_red_scaled$team, "_dark.svg")
   )
 
   # --- HTML OUTPUT ---
@@ -112,9 +112,10 @@ tryCatch({
       opt_interactive(
         active=TRUE,
         use_sorting=TRUE,
-        use_search=TRUE,
         use_filters=TRUE,
-        use_highlight=TRUE
+        use_highlight=TRUE,
+        use_pagination=FALSE,
+        height='auto'
       ) %>%
 
       # Apply the Symmetric Color Scale
