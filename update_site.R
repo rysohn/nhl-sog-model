@@ -116,7 +116,6 @@ tryCatch({
       opt_interactive(
         active=TRUE,
         use_sorting=TRUE,
-        use_filters=TRUE,
         use_highlight=TRUE,
         use_pagination=FALSE,
         height='auto'
