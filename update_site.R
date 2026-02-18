@@ -22,7 +22,7 @@ if(file.exists("train_data.RData")) {
 }
 
 # 2. Get Today's Date
-today <- '2026-02-03'
+today <- '2026-02-04'
 #today <- Sys.Date()
 print(paste("Running model for:", today))
 
@@ -152,7 +152,7 @@ tryCatch({
 
           /* BOTTOM RIGHT NOTE */
           body::after {
-            content: 'Model displaying stats for Feb 3 until end of Olympic Break.';
+            content: '*Model displaying stats for Feb 4 until end of Olympic Break.';
             position: fixed;
             bottom: 15px;
             right: 15px;
