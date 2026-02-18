@@ -1,0 +1,118 @@
+---
+title: "the odds api"
+output: html_document
+date: "2026-02-18"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+```
+
+
+```{r}
+get_nhl_odds <- function(api_key) {
+  # 1. Define Endpoint (NHL Game Odds)
+  url <- paste0(
+    "https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/",
+    "?regions=us&markets=h2h,spreads,totals&oddsFormat=decimal&apiKey=", api_key
+  )
+  
+  # 2. Fetch Data
+  res <- GET(url)
+  if (status_code(res) != 200) return(NULL)
+  
+  data <- fromJSON(content(res, "text"))
+  
+  # 3. Process into a clean dataframe
+  # (This requires some list manipulation depending on the API structure)
+  # ... simplified logic ...
+  
+  # For now, let's create a placeholder that mimics the output 
+  # so you can see how to merge it.
+  return(data.frame(team = "NYR", vegas_line = 32.5))
+}
+
+```
+
+
+```{r}
+api_key <- '57ba1d42f50b762a2a48b59dfc48f795'
+sport <- 'icehockey_nhl'
+market_key <- 'player_goalie_saves'
+bookmaker_key <- 'caesars'
+
+events_url <- paste0(
+  "https://api.the-odds-api.com/v4/sports/", sport, 
+  "/events?apiKey=", api_key, 
+  "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ")
+)
+
+events_res <- GET(events_url)
+events_data <- fromJSON(content(events_res, "text", encoding = "UTF-8"))
+
+if (length(events_data) == 0) {
+  stop("No upcoming NHL games found.")
+}
+
+all_goalie_saves <- data.frame()
+
+for (i in 1:nrow(events_data)) {
+  event_id <- events_data$id[i]
+  game_title <- paste(events_data$home_team[i], "vs", events_data$away_team[i])
+  
+  odds_url <- paste0(
+    "https://api.the-odds-api.com/v4/sports/", SPORT, 
+    "/events/", event_id, "/odds",
+    "?apiKey=", API_KEY,
+    "&regions=us",              # Caesars is a US bookmaker
+    "&markets=", MARKET_KEY,    # Requesting specific goalie saves market
+    "&bookmakers=", BOOKMAKER_KEY,
+    "&oddsFormat=decimal"       # or 'american'
+  )
+  
+  odds_res <- GET(odds_url)
+  
+  # Check if successful
+  if (status_code(odds_res) == 200) {
+    odds_data <- fromJSON(content(odds_res, "text", encoding = "UTF-8"))
+    
+    # Check if Caesars has odds for this game
+    if (!is.null(odds_data$bookmakers) && length(odds_data$bookmakers) > 0) {
+      
+      # Extract the market data
+      bm_data <- odds_data$bookmakers
+      
+      # The API might return a list of bookmakers, usually just one since we filtered
+      for (b in 1:nrow(bm_data)) {
+        markets <- bm_data$markets[[b]]
+        
+        # Check if the requested market exists
+        if (!is.null(markets) && nrow(markets) > 0) {
+          outcomes <- markets$outcomes[[1]]
+          
+          # Add Game Info to the dataframe
+          outcomes$game <- game_title
+          outcomes$commence_time <- events_data$commence_time[i]
+          outcomes$bookmaker <- bm_data$title[b]
+          
+          all_goalie_saves <- bind_rows(all_goalie_saves, outcomes)
+        }
+      }
+    }
+  }
+  
+  # Respect API Rate Limits (optional slight pause)
+  Sys.sleep(0.5)
+}
+
+
+if (nrow(all_goalie_saves) > 0) {
+  print(all_goalie_saves %>% 
+          select(game, description, name, point, price, bookmaker))
+} else {
+  print("No Goalie Save lines found for Caesars at this time.")
+}
+
+```

@@ -6,6 +6,8 @@ library(caret)
 library(Metrics)
 library(glmnet)
 library(lme4)
+library(httr)
+library(jsonlite)
 
 
 get_team_schedule_df <- function(team_tricode, date, season = 20252026) {

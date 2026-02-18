@@ -149,10 +149,23 @@ tryCatch({
           img { filter: drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.5)); }
           
           .gt_row { vertical-align: middle !important; }
+
+          /* BOTTOM RIGHT NOTE */
+          body::after {
+            content: 'Model displaying stats for Feb 3 until end of Olympic Break.';
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            color: #666; /* Subtle Grey */
+            font-size: 12px;
+            font-family: sans-serif;
+            z-index: 1000;
+            pointer-events: none; /* Lets you click through it if it covers something */
+          }
         "
       ) %>%
 
-      tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
+      tab_header(title = paste("NHL Shot Predictions: ", today)) %>%
       cols_label(
         'logo_url' = "", 
         'team' = "Team",
