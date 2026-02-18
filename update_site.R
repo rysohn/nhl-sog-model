@@ -91,7 +91,7 @@ tryCatch({
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
       daily_report_red_scaled$team, 
-      "_light.svg' style='height:35px; vertical-align:middle;'>")
+      "_dark.svg' style='height:35px; vertical-align:middle;'>")
   )
 
   # --- HTML OUTPUT ---
@@ -125,8 +125,31 @@ tryCatch({
       data_color(
         columns = pred_sog_wide,
         method = "numeric",
-        palette = c("#ffcccc", "#ffffff", "#ccffcc"), # Red -> White -> Green
-        domain = symmetric_domain # Forces White to land exactly on 28.02844
+        palette = c("#ff5555", "#333333", "#55ff55"), 
+        domain = symmetric_domain
+      ) %>%
+
+      tab_options(
+        table.background.color = "#121212",
+        heading.background.color = "#121212",
+        column_labels.background.color = "#2c2c2c",
+        table.font.color = "#e0e0e0",
+        table.border.top.color = "#444444",
+        table.border.bottom.color = "#444444",
+        heading.title.font.size = px(24),
+        heading.subtitle.font.size = px(14)
+      ) %>%
+      
+      # 6. GLOBAL PAGE CSS (This turns the whole page black)
+      opt_css(
+        css = "
+          body { background-color: #121212 !important; color: #e0e0e0; font-family: sans-serif; }
+          .gt_table { background-color: #121212 !important; }
+          input { background-color: #333333 !important; color: white !important; border: 1px solid #555; }
+          img { filter: drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.5)); }
+          
+          .gt_row { vertical-align: middle !important; }
+        "
       ) %>%
 
       tab_header(title = paste("NHL Shot Predictions:", Sys.Date())) %>%
@@ -154,10 +177,11 @@ tryCatch({
   
   # But we ALWAYS write the "No Games" message to the website
   html_content <- paste0(
-    "<div style='text-align:center; padding-top:100px; font-family:sans-serif;'>",
+    "<!DOCTYPE html><html><head><title>NHL Model Status</title></head>",
+    "<body style='background-color:#121212; color:#e0e0e0; text-align:center; font-family:sans-serif; padding-top:100px;'>",
     "<h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1>",
-    "<p style='font-size:20px;'>Check back tomorrow!</p>",
-    "</div>"
+    "<p style='font-size:20px; color:#aaaaaa;'>Check back tomorrow!</p>",
+    "</body></html>"
   )
   
   writeLines(html_content, "index.html")
