@@ -91,7 +91,8 @@ tryCatch({
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
       daily_report_red_scaled$team, 
-      "_dark.svg' style='height:35px; vertical-align:middle;'>")
+      "_dark.svg' style='height:35px; vertical-align:middle;'>"),
+    location = ifelse(home == 1, 'vs', '@')
   )
 
   # --- HTML OUTPUT ---
@@ -108,7 +109,7 @@ tryCatch({
 
     # 4. Generate the Table
     table_html <- daily_report_red_scaled %>%
-      dplyr::select('logo_url', 'team', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
+      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
       gt() %>%
 
       fmt_markdown(columns = logo_url) %>% 
@@ -169,13 +170,16 @@ tryCatch({
       cols_label(
         'logo_url' = "", 
         'team' = "Team",
+        'location' = '',
         'opponent' = "Opponent",
         'floor_sog' = "25th Percentile",
         'pred_sog_wide' = "Predicted Mean",
         'ceiling_sog' = "75th Percentile"
       ) %>%
       cols_align(align = "right", columns = logo_url) %>%
-      cols_align(align = "left", columns = team)
+      cols_align(align = "left", columns = team) %>%
+      cols_align(align = 'center', columns = location) %>%
+      cols_width(location ~ px(35))
 
   # Save the updated file
     gtsave(table_html, 'index.html')
