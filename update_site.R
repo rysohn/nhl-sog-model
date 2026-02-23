@@ -112,10 +112,9 @@ tryCatch({
       dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
       gt() %>%
 
+      fmt_number(columns='pred_sog_wide', decimals=1) %>%
+      fmt_number(columns=c('floor_sog', 'ceiling_sog'), decimals=0) %>%
       fmt_markdown(columns = logo_url) %>% 
-
-      fmt_number(columns=pred_sog_wide, decimals=1) %>%
-      fmt_number(columns=c(floor_sog, ceiling_sog), decimals=0) %>%
       
       opt_interactive(
         active=TRUE,
