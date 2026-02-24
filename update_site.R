@@ -22,8 +22,7 @@ if(file.exists("train_data.RData")) {
 }
 
 # 2. Get Today's Date
-today <- '2026-02-04'
-#today <- Sys.Date()
+today <- Sys.Date()
 print(paste("Running model for:", today))
 
 tryCatch({
