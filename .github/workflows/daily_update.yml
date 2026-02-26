@@ -26,7 +26,7 @@ jobs:
         run: |
           options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
           # Ensure 'remotes' is installed here
-          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr2', 'jsonlite'))
+          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr', 'jsonlite'))
         shell: Rscript {0}
 
       - name: Install nhlscraper 0.2.0
