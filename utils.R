@@ -198,6 +198,16 @@ get_full_away_preds <- function(tricode, date){
 
 get_game_shot_allowed_report <- function(game_id, team_id) {
   pbp <- get_gc_play_by_play(game_id)
+  if (nrow(pbp) == 0 || !"typeCode" %in% names(pbp)) {
+    return(
+      tibble(
+        total_shot_attempts = NA_real_,
+        shots_on_goal_plus_goals = NA_real_,
+        blocked_shots = NA_real_,
+        missed_shots = NA_real_
+      )
+    )
+  }
   shot_codes <- c(505, 506, 507, 508) # goal, shot on goal, missed, blocked
   shot_pbp <- pbp %>%
     dplyr::filter(typeCode %in% shot_codes) %>%
