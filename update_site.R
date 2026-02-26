@@ -22,7 +22,7 @@ if(file.exists("train_data.RData")) {
 }
 
 # 2. Get Today's Date
-today <- Sys.Date()
+today <- as.Date(format(Sys.time(), tz = "America/New_York"))
 print(paste("Running model for:", today))
 
 tryCatch({
