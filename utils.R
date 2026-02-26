@@ -103,7 +103,7 @@ get_away_splits <- function(team_tricode, date){
     game_log <- rbind(game_log, game_report)
   }
   
-  away_mean_team_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  away_mean_team_log <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(away_mean_team_log)
 }
 
@@ -131,7 +131,7 @@ get_home_splits <- function(team_tricode, date){
     game_log <- rbind(game_log, game_report)
   }
   
-  home_mean_team_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  home_mean_team_log <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(home_mean_team_log)
 }
 
@@ -151,7 +151,7 @@ get_team_shot_log <- function(team_tricode, n, date){
     game_report <- get_game_shot_report(game_id, team_id)
     game_log <- rbind(game_log, game_report)
   }
-  game_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  game_log <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(game_log)
 }
 
@@ -243,7 +243,7 @@ get_team_shot_allowed_log <- function(team_tricode, n, date) {
     game_report <- get_game_shot_allowed_report(game_id, team_id)
     game_log <- rbind(game_log, game_report)
   }
-  game_log <- game_log %>% summarise(across(where(is.numeric), mean))
+  game_log <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(game_log)
 }
 
@@ -260,7 +260,7 @@ get_home_allowed_splits <- function(team_tricode, date) {
     game_report <- get_game_shot_allowed_report(game_id, team_id)
     game_log <- rbind(game_log, game_report)
   }
-  home_mean_allowed <- game_log %>% summarise(across(where(is.numeric), mean))
+  home_mean_allowed <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(home_mean_allowed)
 }
 
@@ -277,7 +277,7 @@ get_away_allowed_splits <- function(team_tricode, date) {
     game_report <- get_game_shot_allowed_report(game_id, team_id)
     game_log <- rbind(game_log, game_report)
   }
-  away_mean_allowed <- game_log %>% summarise(across(where(is.numeric), mean))
+  away_mean_allowed <- game_log %>% summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   return(away_mean_allowed)
 }
 

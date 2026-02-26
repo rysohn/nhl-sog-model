@@ -82,8 +82,8 @@ tryCatch({
   }
 
   # Using 0.75 and 0.25 as per your code
-  daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75), 1)
-  daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25), 1)
+  daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
+  daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
 
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
