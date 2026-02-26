@@ -29,9 +29,10 @@ jobs:
           install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr', 'jsonlite'))
         shell: Rscript {0}
 
-      - name: Install nhlscraper
+      - name: Install nhlscraper 0.2.0
         run: |
-          remotes::install_github("RentoSaijo/nhlscraper")
+          # This pulls specifically version 0.2.0 from the CRAN archive
+          remotes::install_version("nhlscraper", version = "0.2.0", repos = "http://cran.us.r-project.org", upgrade = "never")
         shell: Rscript {0}
 
       - name: Run Model
