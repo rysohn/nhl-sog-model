@@ -2,8 +2,8 @@ name: Daily NHL Model Update
 
 on:
   schedule:
-    - cron: '0 8 * * *' # This runs every day at 13:00 UTC (8:00 AM EST)
-  workflow_dispatch:      # This allows you to run it manually for testing
+    - cron: '21 7 * * *'
+  workflow_dispatch:    
 
 jobs:
   build:
