@@ -211,27 +211,39 @@ tryCatch({
   # Calculate Expected Saves
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
-    exp_goalie_saves = pred_sog_wide - vegas_goals
+    exp_goalie_saves = pred_sog_wide - vegas_goals,
+    edge = exp_goalie_saves - vegas_saves
   )
 
   # --- HTML OUTPUT ---
   if(nrow(daily_report_red_scaled)>0){
+    
+    # 1. Color Symmetry for Proj SOG
     center_val <- 28.02844
-    
     max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
-    
     symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
+    
+    # 2. Color Symmetry for Edge (Centered at 0)
+    # suppressWarnings hides the -Inf warning if all lines are NA in the morning
+    max_edge <- suppressWarnings(max(abs(daily_report_red_scaled$edge), na.rm = TRUE))
+    if(is.infinite(max_edge) || is.na(max_edge) || max_edge == 0) {
+      max_edge <- 3 # Failsafe default domain if lines aren't out yet
+    }
+    edge_domain <- c(-max_edge, max_edge)
 
     table_html <- daily_report_red_scaled %>%
+      
+      # Added 'edge' to the select statement
       dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 
                     'floor_sog', 'ceiling_sog', 'vegas_goals', 'goalie_name', 
-                    'vegas_saves', 'exp_goalie_saves') %>%
+                    'vegas_saves', 'exp_goalie_saves', 'edge') %>%
       gt() %>%
 
-      fmt_number(columns=c('pred_sog_wide', 'vegas_goals', 'vegas_saves', 'exp_goalie_saves'), decimals=1) %>%
+      # Formatting updates to include 'edge'
+      fmt_number(columns=c('pred_sog_wide', 'vegas_goals', 'vegas_saves', 'exp_goalie_saves', 'edge'), decimals=1) %>%
       fmt_number(columns=c('floor_sog', 'ceiling_sog'), decimals=0) %>%
       sub_missing(
-        columns = c(goalie_name, vegas_saves, vegas_goals, exp_goalie_saves),
+        columns = c(goalie_name, vegas_saves, vegas_goals, exp_goalie_saves, edge),
         missing_text = "—"
       ) %>%
       fmt_markdown(columns = logo_url) %>% 
@@ -244,11 +256,21 @@ tryCatch({
         height='auto'
       ) %>%
 
+      # Original Color Scale for Projected SOG
       data_color(
         columns = pred_sog_wide,
         method = "numeric",
         palette = c("#ff5555", "#333333", "#55ff55"), 
         domain = symmetric_domain
+      ) %>%
+      
+      # NEW Color Scale for the Edge Column
+      data_color(
+        columns = edge,
+        method = "numeric",
+        palette = c("#ff5555", "#333333", "#55ff55"), 
+        domain = edge_domain,
+        na_color = "#121212" # Ensures early morning NAs stay perfectly dark
       ) %>%
 
       tab_options(
@@ -280,17 +302,18 @@ tryCatch({
         'location' = '',
         'opponent' = "Opponent",
         'floor_sog' = "25%ile",
-        'pred_sog_wide' = "Predicted Mean",
+        'pred_sog_wide' = "Proj. SOG",
         'ceiling_sog' = "75%ile", 
         'vegas_goals' = 'Team O/U',
         'goalie_name' = 'Opp. Goalie',
         'vegas_saves' = 'Goalie Line',
-        'exp_goalie_saves' = 'Proj. Saves'
+        'exp_goalie_saves' = 'Proj. Saves',
+        'edge' = 'Edge'
       ) %>%
       cols_align(align = "right", columns = logo_url) %>%
       cols_align(align = "left", columns = team) %>%
       cols_align(align = 'center', columns = location) %>%
-      cols_width(location ~ px(35))
+      cols_width(location ~ px(35), edge ~ px(70)) # Gave the edge column a dedicated width
 
     gtsave(table_html, 'index.html')
   }else {
@@ -299,7 +322,6 @@ tryCatch({
 
 }, error = function(e) {
   
-# Error Handler
   print("--- R SCRIPT CRASHED ---")
   print(e)
   print(paste("Script stopped (Hidden from user):", e$message))
