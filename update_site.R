@@ -10,13 +10,10 @@ source("utils.R")
 nb_fit <- readRDS("nb_sog_model.rds")
 scaler <- readRDS("sog_scaler.rds")
 
-# We need train_data to calculate the mean for the 'Wide' prediction logic
-# If this file is too large for GitHub, consider hardcoding mean_sog <- 29.5 (or your actual mean)
 if(file.exists("train_data.RData")) {
   load("train_data.RData")
   mean_sog <- mean(train_data$true_sog, na.rm=TRUE)
 } else {
-  # Fallback if file missing (Replace with your actual training mean)
   mean_sog <- 28.02844 
   warning("train_data.RData not found. Using default mean_sog = 28.03")
 }
@@ -33,7 +30,7 @@ tryCatch({
     stop("No games scheduled today.")
   }
 
-  # --- FEATURE ENGINEERING (From RUN ME Chunk) ---
+  # Feature Engineering
   daily_reports$sog_trend <- daily_reports$l4_sog - daily_reports$l8_sog
   daily_reports$sog_ag_trend <- daily_reports$l4_sog_ag - daily_reports$l8_sog_ag
   daily_reports$home <- ifelse(daily_reports$'h/a' == 'home', 1, 0)
@@ -41,13 +38,12 @@ tryCatch({
   daily_reports$shot_perc_ag <- daily_reports$l8_sog_ag / daily_reports$l8_sa_ag
   daily_reports$pred_sog <- NA
   
-  # Select columns
   daily_report_red <- daily_reports %>% 
     dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 
                     'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 
                     'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
   
-  # --- SCALING ---
+  # Scaling
   req_vars <- scaler$method$center
   miss_vars <- setdiff(req_vars, names(daily_report_red))
   daily_report_red[miss_vars] <- 0
@@ -55,22 +51,21 @@ tryCatch({
   daily_report_red_scaled <- daily_report_red
   daily_report_red_scaled[req_vars] <- predict(scaler, daily_report_red[req_vars])
   
-  # Ensure column order matches model expectation
   daily_report_red_scaled <- daily_report_red_scaled %>%
     dplyr::select(all_of(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 
                            'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 
                            'shot_perc_ag', 'home', 'pred_sog')))
 
-  # --- PREDICTION ---
+  # Prediction
   daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
   daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
 
-  # --- WIDE PREDICTION (Amplifier) ---
+  # Amplifier
   spread_factor <- 1.2
   daily_report_red_scaled$pred_sog_wide <- round(mean_sog + 
     (daily_report_red_scaled$pred_sog - mean_sog) * spread_factor, 1)
 
-  # --- SIMULATIONS (Floor/Ceiling) ---
+  # Floor / Ceiling
   mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
   theta <- nb_fit$theta
 
@@ -81,7 +76,6 @@ tryCatch({
     simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=theta)
   }
 
-  # Using 0.75 and 0.25 as per your code
   daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
   daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
 
@@ -94,25 +88,112 @@ tryCatch({
     location = ifelse(home == 1, 'vs', '@')
   )
 
+  # API Pull
+  API_KEY <- "57ba1d42f50b762a2a48b59dfc48f795"
+    
+  goalie_data <- data.frame()
+    totals_data <- data.frame()
+    
+    tryCatch({
+      events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
+      events <- jsonlite::fromJSON(url(events_url))
+      
+      if(length(events) > 0) {
+        for(i in 1:nrow(events)) {
+          event_id <- events$id[i]
+          
+          odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_goalie_saves,team_totals&bookmakers=caesars")
+          odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
+          
+          if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
+            mkts <- odds_resp$bookmakers$markets[[1]]
+            if(length(mkts) > 0) {
+              
+              for(m in 1:nrow(mkts)) {
+                key <- mkts$key[m]
+                outcomes <- mkts$outcomes[[m]]
+                
+                # Get Goalie Saves
+                if(key == "player_goalie_saves" && "description" %in% names(outcomes)) {
+                  game_goalies <- data.frame(
+                    fullName = outcomes$description, 
+                    goalie_name = outcomes$name,     
+                    vegas_saves = as.numeric(outcomes$point) 
+                  )
+                  goalie_data <- rbind(goalie_data, game_goalies)
+                }
+                
+                # Get Team Totals
+                if(key == "team_totals" && "description" %in% names(outcomes)) {
+                  t_tots <- outcomes[!duplicated(outcomes$description), ]
+                  game_totals <- data.frame(
+                    fullName = t_tots$description,
+                    vegas_goals = as.numeric(t_tots$point)
+                  )
+                  totals_data <- rbind(totals_data, game_totals)
+                }
+              }
+            }
+          }
+          Sys.sleep(0.2)
+        }
+      }
+    }, error = function(e) { print(paste("Betting API Error:", e$message)) })
+
+    team_map <- teams %>% dplyr::select(fullName, triCode)
+    
+    # Join Goalies to Opponent Team
+    if(nrow(goalie_data) > 0) {
+      goalie_data <- left_join(goalie_data, team_map, by="fullName") %>%
+        rename(opponent = triCode) %>% # Join to the opponent column
+        dplyr::select(opponent, vegas_saves, goalie_name) %>%
+        distinct(opponent, .keep_all = TRUE)
+        
+      daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
+    } else {
+      daily_report_red_scaled$vegas_saves <- NA
+      daily_report_red_scaled$goalie_name <- NA
+    }
+
+    # Join Team Total to User Team
+    if(nrow(totals_data) > 0) {
+      totals_data <- left_join(totals_data, team_map, by="fullName") %>%
+        rename(team = triCode) %>% # Join to the shooting team column
+        dplyr::select(team, vegas_goals) %>%
+        distinct(team, .keep_all = TRUE)
+        
+      daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data, by="team")
+    } else {
+      daily_report_red_scaled$vegas_goals <- NA
+    }
+
+    # Calculate Expected Saves
+    daily_report_red_scaled <- daily_report_red_scaled %>%
+    mutate(
+      exp_goalie_saves = pred_sog_wide - vegas_goals,
+      logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg' style='height:35px; vertical-align:middle;'>"),
+      location = ifelse(home == 1, 'vs', '@')
+    )
+
+
   # --- HTML OUTPUT ---
   if(nrow(daily_report_red_scaled)>0){
-    # 1. Define your target center
     center_val <- 28.02844
     
-    # 2. Calculate the maximum deviation from that center in today's data
-    # This ensures that 28.02844 is mathematically in the middle of the scale
     max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
     
-    # 3. Create a symmetric domain (e.g., if max diff is 5, domain is 23.02 to 33.02)
     symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
 
-    # 4. Generate the Table
     table_html <- daily_report_red_scaled %>%
-      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog') %>%
+      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog', 'goalie_name', 'vegas_saves', 'exp_vegas_saves') %>%
       gt() %>%
 
-      fmt_number(columns='pred_sog_wide', decimals=1) %>%
+      fmt_number(columns=c('pred_sog_wide', 'vegas_goals', 'vegas_saves', 'exp_goalie_saves'), decimals=1) %>%
       fmt_number(columns=c('floor_sog', 'ceiling_sog'), decimals=0) %>%
+      fmt_missing(
+        columns = c(goalie_name, vegas_saves, vegas_goals, exp_goalie_saves),
+        missing_text = "—"
+      ) %>%
       fmt_markdown(columns = logo_url) %>% 
       
       opt_interactive(
@@ -123,7 +204,6 @@ tryCatch({
         height='auto'
       ) %>%
 
-      # Apply the Symmetric Color Scale
       data_color(
         columns = pred_sog_wide,
         method = "numeric",
@@ -142,7 +222,6 @@ tryCatch({
         heading.subtitle.font.size = px(14)
       ) %>%
       
-      # 6. GLOBAL PAGE CSS (This turns the whole page black)
       opt_css(
         css = "
           body { background-color: #121212 !important; color: #e0e0e0; font-family: sans-serif; }
@@ -160,27 +239,28 @@ tryCatch({
         'team' = "Team",
         'location' = '',
         'opponent' = "Opponent",
-        'floor_sog' = "25th Percentile",
+        'floor_sog' = "25%ile",
         'pred_sog_wide' = "Predicted Mean",
-        'ceiling_sog' = "75th Percentile"
+        'ceiling_sog' = "75%ile", 
+        'vegas_goals' = 'Team O/U',
+        'goalie_name' = 'Opp. Goalie',
+        'vegas_saves' = 'Goalie Line',
+        'exp_goalie_saves' = 'Proj. Saves'
       ) %>%
       cols_align(align = "right", columns = logo_url) %>%
       cols_align(align = "left", columns = team) %>%
       cols_align(align = 'center', columns = location) %>%
       cols_width(location ~ px(35))
 
-  # Save the updated file
     gtsave(table_html, 'index.html')
   }else {
-    stop("No games scheduled today.") # Passes control to error handler
+    stop("No games scheduled today.") 
   }
 
 }, error = function(e) {
   
-  # We print the REAL error to the console (for you to see in GitHub logs)
   print(paste("Script stopped (Hidden from user):", e$message))
   
-  # But we ALWAYS write the "No Games" message to the website
   html_content <- paste0(
     "<!DOCTYPE html><html><head><title>NHL Model Status</title></head>",
     "<body style='background-color:#121212; color:#e0e0e0; text-align:center; font-family:sans-serif; padding-top:100px;'>",
