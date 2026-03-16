@@ -89,7 +89,11 @@ tryCatch({
   )
 
   # API Pull
-  API_KEY <- "57ba1d42f50b762a2a48b59dfc48f795"
+  API_KEY <- Sys.getenv("ODDS_API_KEY")
+
+  if (API_KEY == "") {
+    warning("API key not found.")
+  }
     
   goalie_data <- data.frame()
     totals_data <- data.frame()
@@ -185,12 +189,14 @@ tryCatch({
     symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
 
     table_html <- daily_report_red_scaled %>%
-      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 'floor_sog', 'ceiling_sog', 'goalie_name', 'vegas_saves', 'exp_vegas_saves') %>%
+      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 
+                    'floor_sog', 'ceiling_sog', 'vegas_goals', 'goalie_name', 
+                    'vegas_saves', 'exp_goalie_saves') %>%
       gt() %>%
 
       fmt_number(columns=c('pred_sog_wide', 'vegas_goals', 'vegas_saves', 'exp_goalie_saves'), decimals=1) %>%
       fmt_number(columns=c('floor_sog', 'ceiling_sog'), decimals=0) %>%
-      fmt_missing(
+      sub_missing(
         columns = c(goalie_name, vegas_saves, vegas_goals, exp_goalie_saves),
         missing_text = "—"
       ) %>%

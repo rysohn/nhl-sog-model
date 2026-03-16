@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-pandoc@v3
 
       - name: Set up R
-        uses: r-lib/actions/setup-r@v2
+        uses: r-lib/actions/setup-r@v3
 
       - name: Install system dependencies
         run: |
@@ -36,6 +36,8 @@ jobs:
         shell: Rscript {0}
 
       - name: Run Model
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: Rscript update_site.R
 
       - name: Commit and Push changes
