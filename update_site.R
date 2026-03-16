@@ -4,6 +4,8 @@ library(MASS)
 library(caret)
 library(nhlscraper)
 library(gt)
+library(httr)
+library(jsonlite)
 
 # 1. Load Functions & Data
 source("utils.R") 
@@ -79,9 +81,9 @@ tryCatch({
   daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
   daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
 
+  # CRITICAL FIX 1: Removed team_id function entirely
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
-    team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
       team, 
       "_dark.svg' style='height:35px; vertical-align:middle;'>"),
@@ -96,9 +98,9 @@ tryCatch({
   }
     
   goalie_data <- data.frame()
-    totals_data <- data.frame()
+  totals_data <- data.frame()
     
-    tryCatch({
+  tryCatch({
     events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
     events <- jsonlite::fromJSON(url(events_url))
     
@@ -146,73 +148,71 @@ tryCatch({
         Sys.sleep(0.2)
       }
     } 
-}, error = function(e) { print(paste("Betting API Error:", e$message)) })
+  }, error = function(e) { print(paste("Betting API Error:", e$message)) })
 
-    team_map <- teams %>% dplyr::select(fullName, triCode)
+  team_map <- teams %>% dplyr::select(fullName, triCode)
     
-    # Join Goalies to Opponent Team
-    if(nrow(goalie_data) > 0) {
-      goalie_data <- distinct(goalie_data, fullName, .keep_all = TRUE)
+  # Join Goalies to Opponent Team
+  if(nrow(goalie_data) > 0) {
+    goalie_data <- distinct(goalie_data, fullName, .keep_all = TRUE)
       
-      goalie_map <- data.frame()
-      unique_opps <- unique(daily_report_red_scaled$opponent)
+    goalie_map <- data.frame()
+    unique_opps <- unique(daily_report_red_scaled$opponent)
         
     for(opp in unique_opps) {
-        roster_url <- paste0("https://api-web.nhle.com/v1/roster/", opp, "/current")
-        roster_resp <- try(jsonlite::fromJSON(url(roster_url)), silent=TRUE)
+      roster_url <- paste0("https://api-web.nhle.com/v1/roster/", opp, "/current")
+      roster_resp <- try(jsonlite::fromJSON(url(roster_url)), silent=TRUE)
         
-        if(!inherits(roster_resp, "try-error") && "goalies" %in% names(roster_resp)) {
-          if(is.data.frame(roster_resp$goalies) && nrow(roster_resp$goalies) > 0) {
-            temp_map <- data.frame(
-              nhl_last_name = tolower(roster_resp$goalies$lastName$default),
-              opponent = opp,
-              stringsAsFactors = FALSE
-            )
-            goalie_map <- rbind(goalie_map, temp_map)
-          }
+      if(!inherits(roster_resp, "try-error") && "goalies" %in% names(roster_resp)) {
+        if(is.data.frame(roster_resp$goalies) && nrow(roster_resp$goalies) > 0) {
+          temp_map <- data.frame(
+            nhl_last_name = tolower(roster_resp$goalies$lastName$default),
+            opponent = opp,
+            stringsAsFactors = FALSE
+          )
+          goalie_map <- rbind(goalie_map, temp_map)
         }
       }
+    }
 
-      goalie_data$opponent <- NA
-      for(i in 1:nrow(goalie_data)) {
-        g_name <- tolower(goalie_data$fullName[i]) 
-        match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
+    goalie_data$opponent <- NA
+    for(i in 1:nrow(goalie_data)) {
+      g_name <- tolower(goalie_data$fullName[i])
+      match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
         
-        if(length(match_idx) > 0) {
-          goalie_data$opponent[i] <- goalie_map$opponent[match_idx[1]]
-        }
+      if(length(match_idx) > 0) {
+        goalie_data$opponent[i] <- goalie_map$opponent[match_idx[1]]
       }
-
-      goalie_data <- goalie_data %>% 
-        filter(!is.na(opponent)) %>% 
-        rename(goalie_name = caesars_goalie)
-        
-      daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
-    } else {
-      daily_report_red_scaled$vegas_saves <- NA
-      daily_report_red_scaled$goalie_name <- NA
     }
 
-    # Join Team Total to User Team
-    if(nrow(totals_data) > 0) {
-      totals_data <- left_join(totals_data, team_map, by="fullName") %>%
-        rename(team = triCode) %>% # Join to the shooting team column
-        dplyr::select(team, vegas_goals) %>%
-        distinct(team, .keep_all = TRUE)
+    goalie_data <- goalie_data %>% 
+      filter(!is.na(opponent)) %>% 
+      dplyr::select(-goalie_name) %>% 
+      rename(goalie_name = fullName)
         
-      daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data, by="team")
-    } else {
-      daily_report_red_scaled$vegas_goals <- NA
-    }
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
+  } else {
+    daily_report_red_scaled$vegas_saves <- NA
+    daily_report_red_scaled$goalie_name <- NA
+  }
 
-    # Calculate Expected Saves
-    daily_report_red_scaled <- daily_report_red_scaled %>%
-    mutate(
-      exp_goalie_saves = pred_sog_wide - vegas_goals,
-      logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg' style='height:35px; vertical-align:middle;'>"),
-      location = ifelse(home == 1, 'vs', '@')
-    )
+  # Join Team Total to User Team
+  if(nrow(totals_data) > 0) {
+    totals_data <- left_join(totals_data, team_map, by="fullName") %>%
+      rename(team = triCode) %>% 
+      dplyr::select(team, vegas_goals) %>%
+      distinct(team, .keep_all = TRUE)
+        
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data, by="team")
+  } else {
+    daily_report_red_scaled$vegas_goals <- NA
+  }
 
+  # Calculate Expected Saves
+  daily_report_red_scaled <- daily_report_red_scaled %>%
+  mutate(
+    exp_goalie_saves = pred_sog_wide - vegas_goals
+  )
 
   # --- HTML OUTPUT ---
   if(nrow(daily_report_red_scaled)>0){
@@ -299,6 +299,9 @@ tryCatch({
 
 }, error = function(e) {
   
+# Error Handler
+  print("--- R SCRIPT CRASHED ---")
+  print(e)
   print(paste("Script stopped (Hidden from user):", e$message))
   
   html_content <- paste0(
