@@ -83,7 +83,7 @@ tryCatch({
   mutate(
     team_id = sapply(team, get_team_id), # Uses your existing get_team_id function
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
-      daily_report_red_scaled$team, 
+      team, 
       "_dark.svg' style='height:35px; vertical-align:middle;'>"),
     location = ifelse(home == 1, 'vs', '@')
   )
@@ -99,55 +99,60 @@ tryCatch({
     totals_data <- data.frame()
     
     tryCatch({
-      events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
-      events <- jsonlite::fromJSON(url(events_url))
-      
-      if(length(events) > 0) {
-        for(i in 1:nrow(events)) {
-          event_id <- events$id[i]
+    events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
+    events <- jsonlite::fromJSON(url(events_url))
+    
+    if(length(events) > 0) {
+      for(i in 1:nrow(events)) {
+        event_id <- events$id[i]
+        
+        odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_total_saves,team_totals&bookmakers=caesars,draftkings,fanduel,betmgm")
+        odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
+        
+        if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
           
-          odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_goalie_saves,team_totals&bookmakers=caesars")
-          odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
-          
-          if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
-            mkts <- odds_resp$bookmakers$markets[[1]]
-            if(length(mkts) > 0) {
-              
-              for(m in 1:nrow(mkts)) {
-                key <- mkts$key[m]
-                outcomes <- mkts$outcomes[[m]]
-                
-                # Get Goalie Saves
-                if(key == "player_goalie_saves" && "description" %in% names(outcomes)) {
-                  game_goalies <- data.frame(
-                    caesars_goalie = outcomes$description,
-                    vegas_saves = as.numeric(outcomes$point) 
-                  )
-                  goalie_data <- rbind(goalie_data, game_goalies)
+          # Loop through whichever bookmakers the API returned
+          for(b in 1:nrow(odds_resp$bookmakers)) {
+             mkts <- odds_resp$bookmakers$markets[[b]]
+             
+             if(length(mkts) > 0) {
+                for(m in 1:nrow(mkts)) {
+                  key <- mkts$key[m]
+                  outcomes <- mkts$outcomes[[m]]
+                  
+                  # Get Goalie Saves
+                  if(key == "player_total_saves" && "description" %in% names(outcomes)) {
+                    game_goalies <- data.frame(
+                      fullName = outcomes$description, 
+                      goalie_name = outcomes$name,     
+                      vegas_saves = as.numeric(outcomes$point) 
+                    )
+                    goalie_data <- rbind(goalie_data, game_goalies)
+                  }
+                  
+                  # Get Team Totals
+                  if(key == "team_totals" && "description" %in% names(outcomes)) {
+                    t_tots <- outcomes[!duplicated(outcomes$description), ]
+                    game_totals <- data.frame(
+                      fullName = t_tots$description,
+                      vegas_goals = as.numeric(t_tots$point)
+                    )
+                    totals_data <- rbind(totals_data, game_totals)
+                  }
                 }
-                
-                # Get Team Totals
-                if(key == "team_totals" && "description" %in% names(outcomes)) {
-                  t_tots <- outcomes[!duplicated(outcomes$description), ]
-                  game_totals <- data.frame(
-                    fullName = t_tots$description,
-                    vegas_goals = as.numeric(t_tots$point)
-                  )
-                  totals_data <- rbind(totals_data, game_totals)
-                }
-              }
-            }
+             }
           }
-          Sys.sleep(0.2)
         }
+        Sys.sleep(0.2)
       }
-    }, error = function(e) { print(paste("Betting API Error:", e$message)) })
+    } 
+}, error = function(e) { print(paste("Betting API Error:", e$message)) })
 
     team_map <- teams %>% dplyr::select(fullName, triCode)
     
     # Join Goalies to Opponent Team
     if(nrow(goalie_data) > 0) {
-      goalie_data <- distinct(goalie_data, caesars_goalie, .keep_all = TRUE)
+      goalie_data <- distinct(goalie_data, fullName, .keep_all = TRUE)
       
       goalie_map <- data.frame()
       unique_opps <- unique(daily_report_red_scaled$opponent)
@@ -170,7 +175,7 @@ tryCatch({
 
       goalie_data$opponent <- NA
       for(i in 1:nrow(goalie_data)) {
-        g_name <- tolower(goalie_data$caesars_goalie[i])
+        g_name <- tolower(goalie_data$fullName[i]) 
         match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
         
         if(length(match_idx) > 0) {
