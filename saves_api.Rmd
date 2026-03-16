@@ -12,27 +12,91 @@ library(jsonlite)
 
 
 ```{r}
-get_nhl_odds <- function(api_key) {
-  # 1. Define Endpoint (NHL Game Odds)
-  url <- paste0(
-    "https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/",
-    "?regions=us&markets=h2h,spreads,totals&oddsFormat=decimal&apiKey=", api_key
+API_KEY <- "57ba1d42f50b762a2a48b59dfc48f795"
+  
+goalie_data <- data.frame()
+  totals_data <- data.frame()
+  
+  tryCatch({
+    events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
+    events <- jsonlite::fromJSON(url(events_url))
+    
+    if(length(events) > 0) {
+      for(i in 1:nrow(events)) {
+        event_id <- events$id[i]
+        
+        odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_goalie_saves,team_totals&bookmakers=caesars")
+        odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
+        
+        if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
+          mkts <- odds_resp$bookmakers$markets[[1]]
+          if(length(mkts) > 0) {
+            
+            for(m in 1:nrow(mkts)) {
+              key <- mkts$key[m]
+              outcomes <- mkts$outcomes[[m]]
+              
+              # Get Goalie Saves
+              if(key == "player_goalie_saves" && "description" %in% names(outcomes)) {
+                game_goalies <- data.frame(
+                  fullName = outcomes$description, 
+                  goalie_name = outcomes$name,     
+                  vegas_saves = as.numeric(outcomes$point) 
+                )
+                goalie_data <- rbind(goalie_data, game_goalies)
+              }
+              
+              # Get Team Totals
+              if(key == "team_totals" && "description" %in% names(outcomes)) {
+                t_tots <- outcomes[!duplicated(outcomes$description), ]
+                game_totals <- data.frame(
+                  fullName = t_tots$description,
+                  vegas_goals = as.numeric(t_tots$point)
+                )
+                totals_data <- rbind(totals_data, game_totals)
+              }
+            }
+          }
+        }
+        Sys.sleep(0.2)
+      }
+    }
+  }, error = function(e) { print(paste("Betting API Error:", e$message)) })
+
+  team_map <- teams %>% dplyr::select(fullName, triCode)
+  
+  # Join Goalies to Opponent Team
+  if(nrow(goalie_data) > 0) {
+    goalie_data <- left_join(goalie_data, team_map, by="fullName") %>%
+      rename(opponent = triCode) %>% # Join to the opponent column
+      dplyr::select(opponent, vegas_saves, goalie_name) %>%
+      distinct(opponent, .keep_all = TRUE)
+      
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
+  } else {
+    daily_report_red_scaled$vegas_saves <- NA
+    daily_report_red_scaled$goalie_name <- NA
+  }
+
+  # Join Team Total to User Team
+  if(nrow(totals_data) > 0) {
+    totals_data <- left_join(totals_data, team_map, by="fullName") %>%
+      rename(team = triCode) %>% # Join to the shooting team column
+      dplyr::select(team, vegas_goals) %>%
+      distinct(team, .keep_all = TRUE)
+      
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data, by="team")
+  } else {
+    daily_report_red_scaled$vegas_goals <- NA
+  }
+
+  # Calculate Expected Saves
+  daily_report_red_scaled <- daily_report_red_scaled %>%
+  mutate(
+    exp_goalie_saves = pred_sog_wide - vegas_goals,
+    logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg' style='height:35px; vertical-align:middle;'>"),
+    location = ifelse(home == 1, 'vs', '@')
   )
-  
-  # 2. Fetch Data
-  res <- GET(url)
-  if (status_code(res) != 200) return(NULL)
-  
-  data <- fromJSON(content(res, "text"))
-  
-  # 3. Process into a clean dataframe
-  # (This requires some list manipulation depending on the API structure)
-  # ... simplified logic ...
-  
-  # For now, let's create a placeholder that mimics the output 
-  # so you can see how to merge it.
-  return(data.frame(team = "NYR", vegas_line = 32.5))
-}
 
 ```
 

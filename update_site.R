@@ -120,8 +120,7 @@ tryCatch({
                 # Get Goalie Saves
                 if(key == "player_goalie_saves" && "description" %in% names(outcomes)) {
                   game_goalies <- data.frame(
-                    fullName = outcomes$description, 
-                    goalie_name = outcomes$name,     
+                    caesars_goalie = outcomes$description,
                     vegas_saves = as.numeric(outcomes$point) 
                   )
                   goalie_data <- rbind(goalie_data, game_goalies)
@@ -148,10 +147,40 @@ tryCatch({
     
     # Join Goalies to Opponent Team
     if(nrow(goalie_data) > 0) {
-      goalie_data <- left_join(goalie_data, team_map, by="fullName") %>%
-        rename(opponent = triCode) %>% # Join to the opponent column
-        dplyr::select(opponent, vegas_saves, goalie_name) %>%
-        distinct(opponent, .keep_all = TRUE)
+      goalie_data <- distinct(goalie_data, caesars_goalie, .keep_all = TRUE)
+      
+      goalie_map <- data.frame()
+      unique_opps <- unique(daily_report_red_scaled$opponent)
+        
+    for(opp in unique_opps) {
+        roster_url <- paste0("https://api-web.nhle.com/v1/roster/", opp, "/current")
+        roster_resp <- try(jsonlite::fromJSON(url(roster_url)), silent=TRUE)
+        
+        if(!inherits(roster_resp, "try-error") && "goalies" %in% names(roster_resp)) {
+          if(is.data.frame(roster_resp$goalies) && nrow(roster_resp$goalies) > 0) {
+            temp_map <- data.frame(
+              nhl_last_name = tolower(roster_resp$goalies$lastName$default),
+              opponent = opp,
+              stringsAsFactors = FALSE
+            )
+            goalie_map <- rbind(goalie_map, temp_map)
+          }
+        }
+      }
+
+      goalie_data$opponent <- NA
+      for(i in 1:nrow(goalie_data)) {
+        g_name <- tolower(goalie_data$caesars_goalie[i])
+        match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
+        
+        if(length(match_idx) > 0) {
+          goalie_data$opponent[i] <- goalie_map$opponent[match_idx[1]]
+        }
+      }
+
+      goalie_data <- goalie_data %>% 
+        filter(!is.na(opponent)) %>% 
+        rename(goalie_name = caesars_goalie)
         
       daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
     } else {
