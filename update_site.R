@@ -237,12 +237,12 @@ tryCatch({
           combined_text <- "--"
         } else if(edge_num >= 0) {
           bet_call <- paste("O", line_num)
-          edge_color <- "#4CAF50" 
-          combined_text <- paste0(round(proj_saves_num, 1), " (+", round(edge_num, 1), ")")
+          edge_color <- "#4CAF50"
+          combined_text <- paste0(round(proj_saves_num, 1), " <span style='color:", edge_color, ";'>(+", round(edge_num, 1), ")</span>")
         } else {
           bet_call <- paste("U", line_num)
-          edge_color <- "#E64A19" 
-          combined_text <- paste0(round(proj_saves_num, 1), " (", round(edge_num, 1), ")")
+          edge_color <- "#E64A19"
+          combined_text <- paste0(round(proj_saves_num, 1), " <span style='color:", edge_color, ";'>(", round(edge_num, 1), ")</span>")
         }
         
         logo_url <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
@@ -256,7 +256,7 @@ tryCatch({
             "<div class='divider-sub'></div>",
             "<div class='goalie-name'>", goalie_display, "</div>",
             "<div class='data-row'><span>Line</span><span class='val'>", bet_call, "</span></div>",
-            "<div class='data-row'><span>Proj Saves</span><span class='val edge-val' style='color:", edge_color, ";'>", combined_text, "</span></div>",
+            "<div class='data-row'><span>Proj Saves</span><span class='val edge-val'>", combined_text, "</span></div>",
           "</div>"
         )
       }
@@ -300,7 +300,13 @@ tryCatch({
         }
         .header-container { text-align: center; margin-bottom: 30px; }
         h1 { font-weight: 800; letter-spacing: -1px; margin-bottom: 5px; }
-        .subtitle { color: #888; font-size: 14px; }
+        .subtitle { 
+          color: #888; 
+          font-size: 12px; 
+          font-weight: 400; 
+          text-transform: uppercase; 
+          letter-spacing: 1px; 
+        }
         
         .grid-container {
           display: grid;
@@ -367,7 +373,7 @@ tryCatch({
           border-right: 1px solid #222;
         }
         
-        .team-logo { height: 50px; margin-bottom: 5px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
+        .team-logo { height: 75px; margin-bottom: 5px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
         .team-tricode { font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 1px; margin-bottom: 15px; }
         .goalie-name { font-size: 13px; font-weight: 600; color: #aaa; margin-bottom: 10px; text-align: center; height: 30px; display: flex; align-items: center;}
         
@@ -387,15 +393,15 @@ tryCatch({
       </style></head><body>",
       
       "<div class='header-container'>",
-        "<h1>NHL SHOT Projections</h1>",
-        "<h2>", today, "</h2>",
+        "<h1>NHL Shot Projections</h1>",
+        "<div class='subtitle'>", today, "</div>",
       "</div>",
       
       "<div class='grid-container'>",
         paste(cards_html, collapse = ""),
       "</div>",
       
-      "<div class='footer'>Automated Pipeline | Data: NHL & The Odds API</div>",
+      "<div class='footer'>Data: NHL & The Odds API</div>",
       
       "<script>
         document.querySelectorAll('.card').forEach(card => {
