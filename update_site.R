@@ -97,8 +97,8 @@ tryCatch({
     warning("API key not found.")
   }
     
-  goalie_data <- data.frame()
-  totals_data <- data.frame()
+  goalie_data <- data.frame(fullName = character(), goalie_name = character(), vegas_saves = numeric())
+  totals_data <- data.frame(fullName = character(), vegas_goals = numeric())
     
   tryCatch({
     events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
