@@ -150,6 +150,26 @@ tryCatch({
     } 
   }, error = function(e) { print(paste("Betting API Error:", e$message)) })
 
+
+  # Cache System
+  cache_file <- "odds_cache.rds"
+  
+  if(file.exists(cache_file)) {
+    cache <- readRDS(cache_file)
+    
+    if(cache$date == today) {
+      
+      goalie_data <- bind_rows(goalie_data, cache$goalies) %>%
+        distinct(fullName, .keep_all = TRUE)
+      
+      totals_data <- bind_rows(totals_data, cache$totals) %>%
+        distinct(fullName, .keep_all = TRUE)
+    }
+  }
+  
+  # 3. Save the newly merged master list back to the server for the next run
+  saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
+
   team_map <- teams %>% dplyr::select(fullName, triCode)
     
   # Join Goalies to Opponent Team
