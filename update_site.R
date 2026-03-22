@@ -236,9 +236,9 @@ tryCatch({
         
         # Color & Text Routing
         if(is.na(line_num) || is.na(edge_num) || is.na(proj_saves_num)) {
-          bet_call <- "WAIT"
+          bet_call <- "--"
           edge_color <- "#777777"
-          combined_text <- "—"
+          combined_text <- "--"
         } else if(edge_num >= 0) {
           bet_call <- paste("O", line_num)
           edge_color <- "#4CAF50" # Green
@@ -258,6 +258,7 @@ tryCatch({
         paste0(
           "<div class='team-col'>",
             "<img src='", logo_url, "' class='team-logo'>",
+            "<div class='team-tricode'>", team, "</div>",
             "<div class='data-row'><span>Proj SOG</span><span class='val'>", round(as.numeric(proj_sog), 1), "</span></div>",
             "<div class='divider-sub'></div>",
             "<div class='goalie-name'>", goalie_display, "</div>",
@@ -284,9 +285,12 @@ tryCatch({
       # Combine them into a single Card wrapper
       paste0(
         "<div class='card'>",
-          away_html,
-          "<div class='vs-divider'>@</div>",
-          home_html,
+          "<div class='card-border-glow'></div>",
+          "<div class='card-content'>",
+            away_html,
+            "<div class='vs-divider'>@</div>",
+            home_html,
+          "</div>",
         "</div>"
       )
     })
@@ -317,17 +321,41 @@ tryCatch({
         }
         
         .card {
-          background-color: #1a1a1a;
-          border: 1px solid #333;
+          position: relative;
           border-radius: 12px;
+          padding: 2px; 
+          background-color: #222; 
+          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+          transition: transform 0.2s;
+          overflow: hidden; 
+        }
+        .card:hover { transform: translateY(-3px); }
+        
+        .card-border-glow {
+          position: absolute;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: radial-gradient(
+            300px circle at var(--mouse-x, 0) var(--mouse-y, 0), 
+            rgba(255, 255, 255, 0.7), 
+            transparent 40%
+          );
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          z-index: 0;
+        }
+        .card:hover .card-border-glow { opacity: 1; }
+        
+        .card-content {
+          position: relative;
+          background-color: #1a1a1a;
+          border-radius: 10px; 
           display: flex;
           flex-direction: row;
           align-items: stretch;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-          transition: transform 0.2s;
-          overflow: hidden;
+          width: 100%;
+          height: 100%;
+          z-index: 1;
         }
-        .card:hover { transform: translateY(-3px); border-color: #555; }
         
         .team-col {
           flex: 1;
@@ -349,7 +377,8 @@ tryCatch({
           border-right: 1px solid #222;
         }
         
-        .team-logo { height: 50px; margin-bottom: 15px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
+        .team-logo { height: 50px; margin-bottom: 5px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
+        .team-tricode { font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 1px; margin-bottom: 15px; }
         .goalie-name { font-size: 13px; font-weight: 600; color: #aaa; margin-bottom: 10px; text-align: center; height: 30px; display: flex; align-items: center;}
         
         .data-row {
@@ -368,15 +397,30 @@ tryCatch({
       </style></head><body>",
       
       "<div class='header-container'>",
-        "<h1>NHL Prop Projections</h1>",
-        "<div class='subtitle'>Actionable edges for ", today, "</div>",
+        "<h1>NHL SHOT Projections</h1>",
+        "<h2>", today, "</h2>",
       "</div>",
       
       "<div class='grid-container'>",
         paste(cards_html, collapse = ""),
       "</div>",
       
-      "<div class='footer'>Data: NHL & The Odds API</div>",
+      "<div class='footer'>Automated Pipeline | Data: NHL & The Odds API</div>",
+      
+      "<script>
+        document.querySelectorAll('.card').forEach(card => {
+          card.addEventListener('mousemove', e => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Sends the mouse coordinates directly to the CSS gradient
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
+          });
+        });
+      </script>",
+      
       "</body></html>"
     )
     
