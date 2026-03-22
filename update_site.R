@@ -208,7 +208,8 @@ tryCatch({
     goalie_data <- goalie_data %>% 
       filter(!is.na(opponent)) %>% 
       dplyr::select(-goalie_name) %>% 
-      rename(goalie_name = fullName)
+      rename(goalie_name = fullName) %>%
+      distinct(opponent, .keep_all = TRUE)
         
     daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
   } else {
