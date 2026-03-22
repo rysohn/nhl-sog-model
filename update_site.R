@@ -215,46 +215,39 @@ tryCatch({
     edge = exp_goalie_saves - vegas_saves
   )
 
-# --- DUAL-COLUMN HTML CARD OUTPUT ---
+# --- HTML Output ---
   if(nrow(daily_report_red_scaled) > 0) {
     
-    # 1. Restructure Data: Pair Away and Home teams by Game ID
     away_df <- daily_report_red_scaled %>% filter(location == "@")
     home_df <- daily_report_red_scaled %>% filter(location == "vs")
     
     games_df <- inner_join(away_df, home_df, by = "game_id", suffix = c("_away", "_home"))
     
-    # 2. Generate the HTML for each Game Card
     cards_html <- apply(games_df, 1, function(row) {
       
-      # Helper function to build half of the card (one team's column)
-      # ADDED proj_saves to the function arguments
+
       build_team_column <- function(team, proj_sog, goalie, line, edge, proj_saves) {
         line_num <- suppressWarnings(as.numeric(line))
         edge_num <- suppressWarnings(as.numeric(edge))
         proj_saves_num <- suppressWarnings(as.numeric(proj_saves))
         
-        # Color & Text Routing
         if(is.na(line_num) || is.na(edge_num) || is.na(proj_saves_num)) {
           bet_call <- "--"
           edge_color <- "#777777"
           combined_text <- "--"
         } else if(edge_num >= 0) {
           bet_call <- paste("O", line_num)
-          edge_color <- "#4CAF50" # Green
-          # Combines Projected Saves and Positive Edge
+          edge_color <- "#4CAF50" 
           combined_text <- paste0(round(proj_saves_num, 1), " (+", round(edge_num, 1), ")")
         } else {
           bet_call <- paste("U", line_num)
-          edge_color <- "#E64A19" # Red
-          # Combines Projected Saves and Negative Edge
+          edge_color <- "#E64A19" 
           combined_text <- paste0(round(proj_saves_num, 1), " (", round(edge_num, 1), ")")
         }
         
         logo_url <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
         goalie_display <- ifelse(is.na(goalie), "Unconfirmed", goalie)
         
-        # HTML structure for the column
         paste0(
           "<div class='team-col'>",
             "<img src='", logo_url, "' class='team-logo'>",
@@ -268,8 +261,7 @@ tryCatch({
         )
       }
       
-      # Build the Away (Left) and Home (Right) columns
-      # Passing 'exp_goalie_saves' into the new function argument
+
       away_html <- build_team_column(
         row["team_away"], row["pred_sog_wide_away"], 
         row["goalie_name_away"], row["vegas_saves_away"], 
@@ -282,7 +274,6 @@ tryCatch({
         row["edge_home"], row["exp_goalie_saves_home"]
       )
       
-      # Combine them into a single Card wrapper
       paste0(
         "<div class='card'>",
           "<div class='card-border-glow'></div>",
@@ -295,7 +286,6 @@ tryCatch({
       )
     })
     
-    # 3. Assemble the Master HTML Document with CSS
     full_html <- paste0(
       "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>",
       "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
@@ -424,7 +414,6 @@ tryCatch({
       "</body></html>"
     )
     
-    # 4. Save the HTML file
     writeLines(full_html, "index.html")
     
   } else {
