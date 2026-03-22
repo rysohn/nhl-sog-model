@@ -158,7 +158,6 @@ tryCatch({
     cache <- readRDS(cache_file)
     
     if(cache$date == today) {
-      
       goalie_data <- bind_rows(goalie_data, cache$goalies) %>%
         distinct(fullName, .keep_all = TRUE)
       
@@ -166,16 +165,10 @@ tryCatch({
         distinct(fullName, .keep_all = TRUE)
     }
   }
-  
-  # 3. Save the newly merged master list back to the server for the next run
-  saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
 
   team_map <- teams %>% dplyr::select(fullName, triCode)
     
-  # Join Goalies to Opponent Team
   if(nrow(goalie_data) > 0) {
-    goalie_data <- distinct(goalie_data, fullName, .keep_all = TRUE)
-      
     goalie_map <- data.frame()
     unique_opps <- unique(daily_report_red_scaled$opponent)
         
@@ -207,24 +200,30 @@ tryCatch({
 
     goalie_data <- goalie_data %>% 
       filter(!is.na(opponent)) %>% 
+      distinct(opponent, .keep_all = TRUE) 
+  }
+
+  saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
+
+  if(nrow(goalie_data) > 0) {
+    
+    goalie_data_clean <- goalie_data %>%
       dplyr::select(-goalie_name) %>% 
-      rename(goalie_name = fullName) %>%
-      distinct(opponent, .keep_all = TRUE)
-        
-    daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data, by="opponent")
+      rename(goalie_name = fullName)
+    
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, goalie_data_clean, by="opponent")
   } else {
     daily_report_red_scaled$vegas_saves <- NA
     daily_report_red_scaled$goalie_name <- NA
   }
 
-  # Join Team Total to User Team
   if(nrow(totals_data) > 0) {
-    totals_data <- left_join(totals_data, team_map, by="fullName") %>%
+    totals_data_clean <- left_join(totals_data, team_map, by="fullName") %>%
       rename(team = triCode) %>% 
       dplyr::select(team, vegas_goals) %>%
       distinct(team, .keep_all = TRUE)
         
-    daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data, by="team")
+    daily_report_red_scaled <- left_join(daily_report_red_scaled, totals_data_clean, by="team")
   } else {
     daily_report_red_scaled$vegas_goals <- NA
   }
