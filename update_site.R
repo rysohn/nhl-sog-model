@@ -311,12 +311,12 @@ tryCatch({
       color_home <- ifelse(row["team_home"] %in% names(nhl_colors), nhl_colors[row["team_home"]], "#ffffff")
 
       paste0(
-        "<div class='card' style='--away-color: ", color_away, "; --home-color: ", color_home, ";'>",
+        "<div class='card' style='--away-color: ", color_home, "; --home-color: ", color_away, ";'>",
           "<div class='card-border-glow'></div>",
           "<div class='card-content'>",
-            away_html,
-            "<div class='vs-divider'>@</div>",
             home_html,
+            "<div class='vs-divider'>@</div>",
+            away_html,
           "</div>",
         "</div>"
       )
