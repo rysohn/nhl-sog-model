@@ -265,17 +265,21 @@ tryCatch({
         proj_saves_num <- suppressWarnings(as.numeric(proj_saves))
         
         if(is.na(line_num) || is.na(edge_num) || is.na(proj_saves_num)) {
-          bet_call <- "--"
+          line_display <- "--"
+          proj_saves_display <- "--"
+          edge_display <- "--"
           edge_color <- "#777777"
-          combined_text <- "--"
-        } else if(edge_num >= 0) {
-          bet_call <- paste("O", line_num)
-          edge_color <- "#4CAF50"
-          combined_text <- paste0(round(proj_saves_num, 1), " <span style='color:", edge_color, ";'>(+", round(edge_num, 1), ")</span>")
         } else {
-          bet_call <- paste("U", line_num)
-          edge_color <- "#E64A19"
-          combined_text <- paste0(round(proj_saves_num, 1), " <span style='color:", edge_color, ";'>(", round(edge_num, 1), ")</span>")
+          line_display <- as.character(line_num)
+          proj_saves_display <- as.character(round(proj_saves_num, 1))
+          
+          if(edge_num >= 0) {
+            edge_color <- "#4CAF50" # Green
+            edge_display <- paste0("+", round(edge_num, 1))
+          } else {
+            edge_color <- "#E64A19" # Red
+            edge_display <- as.character(round(edge_num, 1))
+          }
         }
         
         logo_url <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
@@ -288,8 +292,9 @@ tryCatch({
             "<div class='data-row'><span>Proj SOG</span><span class='val'>", round(as.numeric(proj_sog), 1), "</span></div>",
             "<div class='divider-sub'></div>",
             "<div class='goalie-name'>", goalie_display, "</div>",
-            "<div class='data-row'><span>Line</span><span class='val'>", bet_call, "</span></div>",
-            "<div class='data-row'><span>Proj Saves</span><span class='val edge-val'>", combined_text, "</span></div>",
+            "<div class='data-row'><span>Line</span><span class='val'>", line_display, "</span></div>",
+            "<div class='data-row'><span>Proj Saves</span><span class='val'>", proj_saves_display, "</span></div>",
+            "<div class='data-row'><span>Edge</span><span class='val edge-val' style='color:", edge_color, ";'>", edge_display, "</span></div>",
           "</div>"
         )
       }
