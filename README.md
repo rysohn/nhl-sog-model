@@ -5,3 +5,4 @@ https://rysohn.github.io/nhl-sog-model/
 
 Planned next steps:
 - Build a long term dashboard to evaluate cumulative effectiveness
+- Add predictive model for scores
