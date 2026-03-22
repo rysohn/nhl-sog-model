@@ -215,66 +215,83 @@ tryCatch({
     edge = exp_goalie_saves - vegas_saves
   )
 
-# --- HTML CARD OUTPUT (REPLACES GT TABLE) ---
+# --- DUAL-COLUMN HTML CARD OUTPUT ---
   if(nrow(daily_report_red_scaled) > 0) {
     
-    # 1. Generate the HTML for each individual card
-    cards_html <- apply(daily_report_red_scaled, 1, function(row) {
+    # 1. Restructure Data: Pair Away and Home teams by Game ID
+    away_df <- daily_report_red_scaled %>% filter(location == "@")
+    home_df <- daily_report_red_scaled %>% filter(location == "vs")
+    
+    games_df <- inner_join(away_df, home_df, by = "game_id", suffix = c("_away", "_home"))
+    
+    # 2. Generate the HTML for each Game Card
+    cards_html <- apply(games_df, 1, function(row) {
       
-      team <- row["team"]
-      opp <- row["opponent"]
-      loc <- row["location"]
-      goalie <- row["goalie_name"]
-      
-      # Handle potential NAs cleanly
-      line <- suppressWarnings(as.numeric(row["vegas_saves"]))
-      proj <- suppressWarnings(as.numeric(row["exp_goalie_saves"]))
-      edge <- suppressWarnings(as.numeric(row["edge"]))
-      
-      # 2. Betting Logic & Color Routing
-      if(is.na(line) || is.na(edge)) {
-        bet_call <- "AWAITING LINES"
-        edge_color <- "#777777" # Grey
-        edge_text <- "—"
-        proj_text <- "—"
-      } else if(edge >= 0) {
-        bet_call <- paste("OVER", line)
-        edge_color <- "#4CAF50" # Modern Green
-        edge_text <- paste0("+", round(edge, 1), " Edge")
-        proj_text <- round(proj, 1)
-      } else {
-        bet_call <- paste("UNDER", line)
-        edge_color <- "#E64A19" # Modern Red
-        edge_text <- paste0(round(edge, 1), " Edge")
-        proj_text <- round(proj, 1)
+      # Helper function to build half of the card (one team's column)
+      # ADDED proj_saves to the function arguments
+      build_team_column <- function(team, proj_sog, goalie, line, edge, proj_saves) {
+        line_num <- suppressWarnings(as.numeric(line))
+        edge_num <- suppressWarnings(as.numeric(edge))
+        proj_saves_num <- suppressWarnings(as.numeric(proj_saves))
+        
+        # Color & Text Routing
+        if(is.na(line_num) || is.na(edge_num) || is.na(proj_saves_num)) {
+          bet_call <- "WAIT"
+          edge_color <- "#777777"
+          combined_text <- "—"
+        } else if(edge_num >= 0) {
+          bet_call <- paste("O", line_num)
+          edge_color <- "#4CAF50" # Green
+          # Combines Projected Saves and Positive Edge
+          combined_text <- paste0(round(proj_saves_num, 1), " (+", round(edge_num, 1), ")")
+        } else {
+          bet_call <- paste("U", line_num)
+          edge_color <- "#E64A19" # Red
+          # Combines Projected Saves and Negative Edge
+          combined_text <- paste0(round(proj_saves_num, 1), " (", round(edge_num, 1), ")")
+        }
+        
+        logo_url <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
+        goalie_display <- ifelse(is.na(goalie), "Unconfirmed", goalie)
+        
+        # HTML structure for the column
+        paste0(
+          "<div class='team-col'>",
+            "<img src='", logo_url, "' class='team-logo'>",
+            "<div class='data-row'><span>Proj SOG</span><span class='val'>", round(as.numeric(proj_sog), 1), "</span></div>",
+            "<div class='divider-sub'></div>",
+            "<div class='goalie-name'>", goalie_display, "</div>",
+            "<div class='data-row'><span>Line</span><span class='val'>", bet_call, "</span></div>",
+            "<div class='data-row'><span>Proj Saves</span><span class='val edge-val' style='color:", edge_color, ";'>", combined_text, "</span></div>",
+          "</div>"
+        )
       }
       
-      # 3. Build the Matchup Header based on Location
-      team_logo <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
-      opp_logo <- paste0("https://assets.nhle.com/logos/nhl/svg/", opp, "_dark.svg")
+      # Build the Away (Left) and Home (Right) columns
+      # Passing 'exp_goalie_saves' into the new function argument
+      away_html <- build_team_column(
+        row["team_away"], row["pred_sog_wide_away"], 
+        row["goalie_name_away"], row["vegas_saves_away"], 
+        row["edge_away"], row["exp_goalie_saves_away"]
+      )
       
-      if(loc == "@") {
-        matchup_html <- paste0("<img src='", team_logo, "' class='logo'><span class='at'>@</span><img src='", opp_logo, "' class='logo'>")
-      } else {
-        matchup_html <- paste0("<img src='", opp_logo, "' class='logo'><span class='at'>@</span><img src='", team_logo, "' class='logo'>")
-      }
+      home_html <- build_team_column(
+        row["team_home"], row["pred_sog_wide_home"], 
+        row["goalie_name_home"], row["vegas_saves_home"], 
+        row["edge_home"], row["exp_goalie_saves_home"]
+      )
       
-      # 4. Construct the Card HTML
+      # Combine them into a single Card wrapper
       paste0(
         "<div class='card'>",
-          "<div class='matchup'>", matchup_html, "</div>",
-          "<div class='goalie'>", ifelse(is.na(goalie), "Unconfirmed Goalie", goalie), "</div>",
-          "<div class='bet-call' style='color:", edge_color, ";'>", bet_call, "</div>",
-          "<div class='divider'></div>",
-          "<div class='stats'>",
-            "<div class='stat-box'><span>Proj Saves</span><strong>", proj_text, "</strong></div>",
-            "<div class='stat-box'><span>Value</span><strong style='color:", edge_color, ";'>", edge_text, "</strong></div>",
-          "</div>",
+          away_html,
+          "<div class='vs-divider'>@</div>",
+          home_html,
         "</div>"
       )
     })
     
-    # 5. Assemble the Master HTML Document with Modern CSS
+    # 3. Assemble the Master HTML Document with CSS
     full_html <- paste0(
       "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>",
       "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
@@ -291,46 +308,67 @@ tryCatch({
         h1 { font-weight: 800; letter-spacing: -1px; margin-bottom: 5px; }
         .subtitle { color: #888; font-size: 14px; }
         
-        /* The CSS Grid that handles mobile-responsiveness */
         .grid-container {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
           gap: 20px;
           max-width: 1200px;
           margin: 0 auto;
         }
         
-        /* Individual Card Styling */
         .card {
           background-color: #1a1a1a;
           border: 1px solid #333;
           border-radius: 12px;
-          padding: 20px;
-          text-align: center;
+          display: flex;
+          flex-direction: row;
+          align-items: stretch;
           box-shadow: 0 4px 6px rgba(0,0,0,0.3);
           transition: transform 0.2s;
+          overflow: hidden;
         }
         .card:hover { transform: translateY(-3px); border-color: #555; }
         
-        .matchup { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 15px; }
-        .logo { height: 45px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
-        .at { color: #666; font-weight: 600; font-size: 14px; }
+        .team-col {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 20px 15px;
+        }
+        .vs-divider {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          color: #444;
+          background-color: #111;
+          padding: 0 10px;
+          font-size: 18px;
+          border-left: 1px solid #222;
+          border-right: 1px solid #222;
+        }
         
-        .goalie { font-size: 16px; font-weight: 600; color: #bbb; margin-bottom: 5px; }
-        .bet-call { font-size: 24px; font-weight: 800; margin-bottom: 15px; letter-spacing: -0.5px; }
+        .team-logo { height: 50px; margin-bottom: 15px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
+        .goalie-name { font-size: 13px; font-weight: 600; color: #aaa; margin-bottom: 10px; text-align: center; height: 30px; display: flex; align-items: center;}
         
-        .divider { height: 1px; background-color: #333; margin-bottom: 15px; }
+        .data-row {
+          display: flex;
+          justify-content: space-between;
+          width: 100%;
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+        .data-row span { color: #777; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        .data-row .val { color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .data-row .edge-val { font-size: 14px; }
         
-        .stats { display: flex; justify-content: space-around; }
-        .stat-box { display: flex; flex-direction: column; }
-        .stat-box span { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .stat-box strong { font-size: 18px; font-variant-numeric: tabular-nums; }
-        
+        .divider-sub { height: 1px; width: 100%; background-color: #333; margin: 10px 0; }
         .footer { text-align: center; margin-top: 40px; color: #555; font-size: 12px; }
       </style></head><body>",
       
       "<div class='header-container'>",
-        "<h1>NHL Goalie Projections</h1>",
+        "<h1>NHL Prop Projections</h1>",
         "<div class='subtitle'>Actionable edges for ", today, "</div>",
       "</div>",
       
@@ -338,11 +376,11 @@ tryCatch({
         paste(cards_html, collapse = ""),
       "</div>",
       
-      "<div class='footer'>Automated Pipeline | Data: NHL & The Odds API</div>",
+      "<div class='footer'>Data: NHL & The Odds API</div>",
       "</body></html>"
     )
     
-    # 6. Save the HTML file
+    # 4. Save the HTML file
     writeLines(full_html, "index.html")
     
   } else {
