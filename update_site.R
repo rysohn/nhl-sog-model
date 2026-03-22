@@ -215,108 +215,137 @@ tryCatch({
     edge = exp_goalie_saves - vegas_saves
   )
 
-  # --- HTML OUTPUT ---
-  if(nrow(daily_report_red_scaled)>0){
+# --- HTML CARD OUTPUT (REPLACES GT TABLE) ---
+  if(nrow(daily_report_red_scaled) > 0) {
     
-    # 1. Color Symmetry for Proj SOG
-    center_val <- 28.02844
-    max_diff <- max(abs(daily_report_red_scaled$pred_sog_wide - center_val), na.rm = TRUE)
-    symmetric_domain <- c(center_val - max_diff, center_val + max_diff)
+    # 1. Generate the HTML for each individual card
+    cards_html <- apply(daily_report_red_scaled, 1, function(row) {
+      
+      team <- row["team"]
+      opp <- row["opponent"]
+      loc <- row["location"]
+      goalie <- row["goalie_name"]
+      
+      # Handle potential NAs cleanly
+      line <- suppressWarnings(as.numeric(row["vegas_saves"]))
+      proj <- suppressWarnings(as.numeric(row["exp_goalie_saves"]))
+      edge <- suppressWarnings(as.numeric(row["edge"]))
+      
+      # 2. Betting Logic & Color Routing
+      if(is.na(line) || is.na(edge)) {
+        bet_call <- "AWAITING LINES"
+        edge_color <- "#777777" # Grey
+        edge_text <- "—"
+        proj_text <- "—"
+      } else if(edge >= 0) {
+        bet_call <- paste("OVER", line)
+        edge_color <- "#4CAF50" # Modern Green
+        edge_text <- paste0("+", round(edge, 1), " Edge")
+        proj_text <- round(proj, 1)
+      } else {
+        bet_call <- paste("UNDER", line)
+        edge_color <- "#E64A19" # Modern Red
+        edge_text <- paste0(round(edge, 1), " Edge")
+        proj_text <- round(proj, 1)
+      }
+      
+      # 3. Build the Matchup Header based on Location
+      team_logo <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
+      opp_logo <- paste0("https://assets.nhle.com/logos/nhl/svg/", opp, "_dark.svg")
+      
+      if(loc == "@") {
+        matchup_html <- paste0("<img src='", team_logo, "' class='logo'><span class='at'>@</span><img src='", opp_logo, "' class='logo'>")
+      } else {
+        matchup_html <- paste0("<img src='", opp_logo, "' class='logo'><span class='at'>@</span><img src='", team_logo, "' class='logo'>")
+      }
+      
+      # 4. Construct the Card HTML
+      paste0(
+        "<div class='card'>",
+          "<div class='matchup'>", matchup_html, "</div>",
+          "<div class='goalie'>", ifelse(is.na(goalie), "Unconfirmed Goalie", goalie), "</div>",
+          "<div class='bet-call' style='color:", edge_color, ";'>", bet_call, "</div>",
+          "<div class='divider'></div>",
+          "<div class='stats'>",
+            "<div class='stat-box'><span>Proj Saves</span><strong>", proj_text, "</strong></div>",
+            "<div class='stat-box'><span>Value</span><strong style='color:", edge_color, ";'>", edge_text, "</strong></div>",
+          "</div>",
+        "</div>"
+      )
+    })
     
-    # 2. Color Symmetry for Edge (Centered at 0)
-    # suppressWarnings hides the -Inf warning if all lines are NA in the morning
-    max_edge <- suppressWarnings(max(abs(daily_report_red_scaled$edge), na.rm = TRUE))
-    if(is.infinite(max_edge) || is.na(max_edge) || max_edge == 0) {
-      max_edge <- 3 # Failsafe default domain if lines aren't out yet
-    }
-    edge_domain <- c(-max_edge, max_edge)
-
-    table_html <- daily_report_red_scaled %>%
+    # 5. Assemble the Master HTML Document with Modern CSS
+    full_html <- paste0(
+      "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>",
+      "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
+      "<title>NHL Prop Projections</title>",
+      "<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { 
+          background-color: #0d0d0d; 
+          color: #e0e0e0; 
+          font-family: 'Inter', sans-serif; 
+          margin: 0; padding: 20px; 
+        }
+        .header-container { text-align: center; margin-bottom: 30px; }
+        h1 { font-weight: 800; letter-spacing: -1px; margin-bottom: 5px; }
+        .subtitle { color: #888; font-size: 14px; }
+        
+        /* The CSS Grid that handles mobile-responsiveness */
+        .grid-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 20px;
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+        
+        /* Individual Card Styling */
+        .card {
+          background-color: #1a1a1a;
+          border: 1px solid #333;
+          border-radius: 12px;
+          padding: 20px;
+          text-align: center;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+          transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); border-color: #555; }
+        
+        .matchup { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .logo { height: 45px; filter: drop-shadow(0px 2px 4px rgba(255,255,255,0.1)); }
+        .at { color: #666; font-weight: 600; font-size: 14px; }
+        
+        .goalie { font-size: 16px; font-weight: 600; color: #bbb; margin-bottom: 5px; }
+        .bet-call { font-size: 24px; font-weight: 800; margin-bottom: 15px; letter-spacing: -0.5px; }
+        
+        .divider { height: 1px; background-color: #333; margin-bottom: 15px; }
+        
+        .stats { display: flex; justify-content: space-around; }
+        .stat-box { display: flex; flex-direction: column; }
+        .stat-box span { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-box strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+        
+        .footer { text-align: center; margin-top: 40px; color: #555; font-size: 12px; }
+      </style></head><body>",
       
-      # Added 'edge' to the select statement
-      dplyr::select('logo_url', 'team', 'location', 'opponent', 'pred_sog_wide', 
-                    'floor_sog', 'ceiling_sog', 'vegas_goals', 'goalie_name', 
-                    'vegas_saves', 'exp_goalie_saves', 'edge') %>%
-      gt() %>%
-
-      # Formatting updates to include 'edge'
-      fmt_number(columns=c('pred_sog_wide', 'vegas_goals', 'vegas_saves', 'exp_goalie_saves', 'edge'), decimals=1) %>%
-      fmt_number(columns=c('floor_sog', 'ceiling_sog'), decimals=0) %>%
-      sub_missing(
-        columns = c(goalie_name, vegas_saves, vegas_goals, exp_goalie_saves, edge),
-        missing_text = "—"
-      ) %>%
-      fmt_markdown(columns = logo_url) %>% 
+      "<div class='header-container'>",
+        "<h1>NHL Goalie Projections</h1>",
+        "<div class='subtitle'>Actionable edges for ", today, "</div>",
+      "</div>",
       
-      opt_interactive(
-        active=TRUE,
-        use_sorting=TRUE,
-        use_highlight=TRUE,
-        use_pagination=FALSE,
-        height='auto'
-      ) %>%
-
-      # Original Color Scale for Projected SOG
-      data_color(
-        columns = pred_sog_wide,
-        method = "numeric",
-        palette = c("#ff5555", "#333333", "#55ff55"), 
-        domain = symmetric_domain
-      ) %>%
+      "<div class='grid-container'>",
+        paste(cards_html, collapse = ""),
+      "</div>",
       
-      # NEW Color Scale for the Edge Column
-      data_color(
-        columns = edge,
-        method = "numeric",
-        palette = c("#ff5555", "#333333", "#55ff55"), 
-        domain = edge_domain,
-        na_color = "#121212" # Ensures early morning NAs stay perfectly dark
-      ) %>%
-
-      tab_options(
-        table.background.color = "#121212",
-        heading.background.color = "#121212",
-        column_labels.background.color = "#2c2c2c",
-        table.font.color = "#e0e0e0",
-        table.border.top.color = "#444444",
-        table.border.bottom.color = "#444444",
-        heading.title.font.size = px(24),
-        heading.subtitle.font.size = px(14)
-      ) %>%
-      
-      opt_css(
-        css = "
-          body { background-color: #121212 !important; color: #e0e0e0; font-family: sans-serif; }
-          .gt_table { background-color: #121212 !important; }
-          input { background-color: #333333 !important; color: white !important; border: 1px solid #555; }
-          img { filter: drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.5)); }
-          
-          .gt_row { vertical-align: middle !important; }
-        "
-      ) %>%
-
-      tab_header(title = paste("NHL Shot Predictions: ", today)) %>%
-      cols_label(
-        'logo_url' = "", 
-        'team' = "Team",
-        'location' = '',
-        'opponent' = "Opponent",
-        'floor_sog' = "25%ile",
-        'pred_sog_wide' = "Proj. SOG",
-        'ceiling_sog' = "75%ile", 
-        'vegas_goals' = 'Team O/U',
-        'goalie_name' = 'Opp. Goalie',
-        'vegas_saves' = 'Goalie Line',
-        'exp_goalie_saves' = 'Proj. Saves',
-        'edge' = 'Edge'
-      ) %>%
-      cols_align(align = "right", columns = logo_url) %>%
-      cols_align(align = "left", columns = team) %>%
-      cols_align(align = 'center', columns = location) %>%
-      cols_width(location ~ px(35), edge ~ px(70)) # Gave the edge column a dedicated width
-
-    gtsave(table_html, 'index.html')
-  }else {
+      "<div class='footer'>Automated Pipeline | Data: NHL & The Odds API</div>",
+      "</body></html>"
+    )
+    
+    # 6. Save the HTML file
+    writeLines(full_html, "index.html")
+    
+  } else {
     stop("No games scheduled today.") 
   }
 
@@ -328,7 +357,7 @@ tryCatch({
   
   html_content <- paste0(
     "<!DOCTYPE html><html><head><title>NHL Model Status</title></head>",
-    "<body style='background-color:#121212; color:#e0e0e0; text-align:center; font-family:sans-serif; padding-top:100px;'>",
+    "<body style='background-color:#0d0d0d; color:#e0e0e0; text-align:center; font-family:sans-serif; padding-top:100px;'>",
     "<h1 style='font-size:40px; margin-bottom:20px;'>No NHL Games Today :(</h1>",
     "<p style='font-size:20px; color:#aaaaaa;'>Check back tomorrow!</p>",
     "</body></html>"
