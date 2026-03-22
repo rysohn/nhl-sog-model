@@ -215,6 +215,19 @@ tryCatch({
     edge = exp_goalie_saves - vegas_saves
   )
 
+# NHL Team Primary Colors
+  nhl_colors <- c(
+    "ANA"="#F47A38", "BOS"="#FFB81C", "BUF"="#002654", "CGY"="#C8102E", 
+    "CAR"="#CE1126", "CHI"="#CF0A2C", "COL"="#6F263D", "CBJ"="#002654", 
+    "DAL"="#006847", "DET"="#CE1126", "EDM"="#FF4C00", "FLA"="#041E42", 
+    "LAK"="#111111", "MIN"="#154734", "MTL"="#AF1E2D", "NSH"="#FFB81C", 
+    "NJD"="#CE1126", "NYI"="#00539B", "NYR"="#0038A8", "OTT"="#E31837", 
+    "PHI"="#F74902", "PIT"="#FCB514", "SJS"="#006D75", "SEA"="#99D9D9", 
+    "STL"="#002F87", "TBL"="#002868", "TOR"="#00205B", "UTA"="#71AFE5", 
+    "VAN"="#00205B", "VGK"="#B4975A", "WSH"="#C8102E", "WPG"="#041E42"
+  )
+
+
 # --- HTML Output ---
   if(nrow(daily_report_red_scaled) > 0) {
     
@@ -274,8 +287,11 @@ tryCatch({
         row["edge_home"], row["exp_goalie_saves_home"]
       )
       
+      color_away <- ifelse(row["team_away"] %in% names(nhl_colors), paste0(nhl_colors[row["team_away"]], "b3"), "rgba(255,255,255,0.7)")
+      color_home <- ifelse(row["team_home"] %in% names(nhl_colors), paste0(nhl_colors[row["team_home"]], "b3"), "rgba(255,255,255,0.7)")
+
       paste0(
-        "<div class='card'>",
+        "<div class='card' data-away-color='", color_away, "' data-home-color='", color_home, "'>",
           "<div class='card-border-glow'></div>",
           "<div class='card-content'>",
             away_html,
@@ -332,7 +348,7 @@ tryCatch({
           top: 0; left: 0; width: 100%; height: 100%;
           background: radial-gradient(
             300px circle at var(--mouse-x, 0) var(--mouse-y, 0), 
-            rgba(255, 255, 255, 0.7), 
+            var(--glow-color, rgba(255, 255, 255, 0.7)),
             transparent 40%
           );
           opacity: 0;
@@ -410,9 +426,12 @@ tryCatch({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Sends the mouse coordinates directly to the CSS gradient
+            const isLeft = x < rect.width / 2;
+            const activeColor = isLeft ? card.dataset.awayColor : card.dataset.homeColor;
+            
             card.style.setProperty('--mouse-x', `${x}px`);
             card.style.setProperty('--mouse-y', `${y}px`);
+            card.style.setProperty('--glow-color', activeColor);
           });
         });
       </script>",
