@@ -307,11 +307,11 @@ tryCatch({
         row["edge_home"], row["exp_goalie_saves_home"]
       )
       
-      color_away <- ifelse(row["team_away"] %in% names(nhl_colors), paste0(nhl_colors[row["team_away"]], "b3"), "rgba(255,255,255,0.7)")
-      color_home <- ifelse(row["team_home"] %in% names(nhl_colors), paste0(nhl_colors[row["team_home"]], "b3"), "rgba(255,255,255,0.7)")
+      color_away <- ifelse(row["team_away"] %in% names(nhl_colors), nhl_colors[row["team_away"]], "#ffffff")
+      color_home <- ifelse(row["team_home"] %in% names(nhl_colors), nhl_colors[row["team_home"]], "#ffffff")
 
       paste0(
-        "<div class='card' data-away-color='", color_away, "' data-home-color='", color_home, "'>",
+        "<div class='card' style='--away-color: ", color_away, "; --home-color: ", color_home, ";'>",
           "<div class='card-border-glow'></div>",
           "<div class='card-content'>",
             away_html,
@@ -355,8 +355,8 @@ tryCatch({
         .card {
           position: relative;
           border-radius: 12px;
-          padding: 2px; 
-          background-color: #222; 
+          padding: 4px; 
+          background-color: #000; 
           box-shadow: 0 4px 6px rgba(0,0,0,0.3);
           transition: transform 0.2s;
           overflow: hidden; 
@@ -366,11 +366,12 @@ tryCatch({
         .card-border-glow {
           position: absolute;
           top: 0; left: 0; width: 100%; height: 100%;
-          background: radial-gradient(
-            300px circle at var(--mouse-x, 0) var(--mouse-y, 0), 
-            var(--glow-color, rgba(255, 255, 255, 0.7)),
-            transparent 40%
-          );
+
+          background: linear-gradient(to right, var(--away-color), var(--home-color));
+
+          -webkit-mask-image: radial-gradient(450px circle at var(--mouse-x, 0) var(--mouse-y, 0), black, transparent 60%);
+          mask-image: radial-gradient(450px circle at var(--mouse-x, 0) var(--mouse-y, 0), black, transparent 60%);
+
           opacity: 0;
           transition: opacity 0.3s ease;
           z-index: 0;
@@ -446,12 +447,9 @@ tryCatch({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            const isLeft = x < rect.width / 2;
-            const activeColor = isLeft ? card.dataset.awayColor : card.dataset.homeColor;
-            
+            // Just track the mouse! CSS handles the gradient colors automatically now.
             card.style.setProperty('--mouse-x', `${x}px`);
             card.style.setProperty('--mouse-y', `${y}px`);
-            card.style.setProperty('--glow-color', activeColor);
           });
         });
       </script>",
