@@ -356,6 +356,34 @@ get_rest <- function(game_id, team_tricode, max_rest = 7) {
 }
 
 
+get_b2b <- function(game_id, team_tricode) {
+  
+  sched <- get_team_schedule(team = toupper(team_tricode))
+  
+  # Defensive check: If no schedule, assume it's not a back-to-back
+  if (!"gameDate" %in% names(sched) || !"id" %in% names(sched)) {
+    return(0)
+  }
+  
+  sched <- sched %>%
+    dplyr::mutate(gameDate = as.Date(gameDate)) %>%
+    dplyr::arrange(gameDate)
+  
+  rownum <- which(sched$id == game_id)
+  
+  # Game not found or first game of the season
+  if (length(rownum) == 0 || rownum == 1) {
+    return(0)
+  }
+  
+  # Calculate rest
+  days_rest <- as.numeric(sched$gameDate[rownum] - sched$gameDate[rownum - 1]) - 1
+  
+  # If days_rest is 0, they played yesterday. Return 1 (Yes) or 0 (No)
+  return(ifelse(days_rest == 0, 1, 0))
+}
+
+
 get_daily_game_reports <- function(date) {
   slate <- get_schedule(date = date) %>%
     dplyr::select(c('id', 'gameType', 'startTimeUTC', 'awayTeam.id', 'awayTeam.abbrev',
@@ -369,7 +397,7 @@ get_daily_game_reports <- function(date) {
   games <- rbind(df, df2)
   games[c('l8_sa', 'l8_sog', 'l8_miss', 'l4_sa', 'l4_sog', 'l4_miss', 'ha_sa', 'ha_sog', 'ha_miss',
           'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 
-          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'rest_diff', 'true_sog')] <- NA
+          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'is_b2b', 'true_sog')] <- NA
   #return(games)
   temp4 <- 0
   for (i in 1:nrow(games)) {
@@ -391,7 +419,7 @@ get_daily_game_reports <- function(date) {
       common_cols_2 <- intersect(names(games[i,]), names(temp2))
       games[i, common_cols_2] <- temp2[1, common_cols_2]
     }
-    games$rest_diff[i] <- get_rest(games$game_id[i], games$team[i]) - get_rest(games$game_id[i], games$opponent[i])
+    games$is_b2b[i] <- get_b2b(games$game_id[i], games$team[i])
     if (date >= Sys.Date()){
       tid <- get_team_id(games$team[i])
       true_sog <- get_game_shot_report(games$game_id[i], tid)

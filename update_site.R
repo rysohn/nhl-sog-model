@@ -6,6 +6,7 @@ library(nhlscraper)
 library(gt)
 library(httr)
 library(jsonlite)
+options(warn = 1)
 
 # 1. Load Functions & Data
 source("utils.R") 

@@ -212,14 +212,14 @@ get_full_home_preds <- function(tricode, date){
   ha_split <- get_home_splits(tricode, date)
   
   l8_log <- l8_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots, l8_blocks = blocked_shots)
   l4_log <- l4_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots, l4_blocks = blocked_shots)
   ha_split <- ha_split %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots, ha_blocks = blocked_shots)
   
   shot_preds <- cbind(l8_log, l4_log, ha_split)
   return(shot_preds)
@@ -232,14 +232,14 @@ get_full_away_preds <- function(tricode, date){
   ha_split    <- get_away_splits(tricode, date)
   
   l8_log <- l8_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots, l8_blocks = blocked_shots)
   l4_log <- l4_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots, l4_blocks = blocked_shots)
   ha_split <- ha_split %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots, ha_blocks = blocked_shots)
   
   shot_preds <- cbind(l8_log, l4_log, ha_split)
   return(shot_preds)
@@ -334,14 +334,14 @@ get_full_against_home_preds <- function(tricode, date){
   home_against <- get_home_allowed_splits(tricode, date)
   
   l8_against <- l8_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots, l8_blocks_ag = blocked_shots)
   l4_against <- l4_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots, l4_blocks_ag = blocked_shots)
   home_against <- home_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots, ha_blocks_ag = blocked_shots)
   
   shot_against_preds <- cbind(l8_against, l4_against, home_against)
   return(shot_against_preds)
@@ -354,14 +354,14 @@ get_full_against_away_preds <- function(tricode, date){
   away_against <- get_away_allowed_splits(tricode, date)
   
   l8_against <- l8_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots, l8_blocks_ag = blocked_shots)
   l4_against <- l4_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots, l4_blocks_ag = blocked_shots)
   away_against <- away_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots, ha_blocks_ag = blocked_shots)
   
   shot_against_preds <- cbind(l8_against, l4_against, away_against)
   return(shot_against_preds)
@@ -409,7 +409,35 @@ get_rest <- function(game_id, team_tricode, max_rest = 7) {
   return(min(days_rest, max_rest))
 }
 
-get_rest(2025020534, 'edm')
+
+get_b2b <- function(game_id, team_tricode) {
+  
+  sched <- get_team_schedule(team = toupper(team_tricode))
+
+  # Defensive check: If no schedule, assume it's not a back-to-back
+  if (!"gameDate" %in% names(sched) || !"id" %in% names(sched)) {
+    return(0)
+  }
+
+  sched <- sched %>%
+    dplyr::mutate(gameDate = as.Date(gameDate)) %>%
+    dplyr::arrange(gameDate)
+
+  rownum <- which(sched$id == game_id)
+
+  # Game not found or first game of the season
+  if (length(rownum) == 0 || rownum == 1) {
+    return(0)
+  }
+
+  # Calculate rest
+  days_rest <- as.numeric(sched$gameDate[rownum] - sched$gameDate[rownum - 1]) - 1
+
+  # If days_rest is 0, they played yesterday. Return 1 (Yes) or 0 (No)
+  return(ifelse(days_rest == 0, 1, 0))
+}
+
+get_b2b(2025020534, 'edm')
 ```
 
 
@@ -427,9 +455,10 @@ get_daily_game_reports <- function(date) {
   df2 <- data.frame(game_id = slate[,1], team = slate[,7], opponent = slate[,5], ha='away')
   names(df2) <- c('game_id', 'team', 'opponent', 'h/a')
   games <- rbind(df, df2)
-  games[c('l8_sa', 'l8_sog', 'l8_miss', 'l4_sa', 'l4_sog', 'l4_miss', 'ha_sa', 'ha_sog', 'ha_miss',
-          'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 
-          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'rest_diff', 'true_sog')] <- NA
+  games[c('l8_sa', 'l8_sog', 'l8_miss', 'l8_blocks', 'l4_sa', 'l4_sog', 'l4_miss', 'l4_blocks', 'ha_sa', 
+          'ha_sog', 'ha_miss', 'ha_blocks', 'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l8_blocks_ag',
+          'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 'l4_blocks_ag', 'ha_sa_ag', 'ha_sog_ag', 
+          'ha_miss_ag', 'ha_blocks_ag', 'is_b2b', 'opp_is_b2b', 'true_sog')] <- NA
   #return(games)
   temp4 <- 0
   for (i in 1:nrow(games)) {
@@ -451,8 +480,9 @@ get_daily_game_reports <- function(date) {
       common_cols_2 <- intersect(names(games[i,]), names(temp2))
       games[i, common_cols_2] <- temp2[1, common_cols_2]
     }
-    games$rest_diff[i] <- get_rest(games$game_id[i], games$team[i]) - get_rest(games$game_id[i], games$opponent[i])
-    if (date >= Sys.Date()){
+    games$is_b2b[i] <- get_b2b(games$game_id[i], games$team[i])
+    games$opp_is_b2b[i] <- get_b2b(games$game_id[i], games$opponent[i])
+    if (date <= Sys.Date()){
       tid <- get_team_id(games$team[i])
       true_sog <- get_game_shot_report(games$game_id[i], tid)
       games$true_sog[i] <- true_sog$shots_on_goal_plus_goals
@@ -463,30 +493,67 @@ get_daily_game_reports <- function(date) {
 
 
 daily_reports <- get_daily_game_reports('2025-12-18')
-#daily_reports
+daily_reports
+```
+
+
+```{r}
+for (i in 1:nrow(train_data_25)) {
+  
+  # Only ping the API if the true_sog is actually missing
+  if (is.na(train_data_25$true_sog[i])) {
+    
+    # Wrap in tryCatch so a single corrupted game doesn't crash the whole 10-minute loop
+    tryCatch({
+      
+      # Grab the team ID and hit the play-by-play endpoint
+      tid <- get_team_id(train_data_25$team[i])
+      shot_report <- get_game_shot_report(train_data_25$game_id[i], tid)
+      
+      # Inject the actual shots back into the dataframe
+      train_data_25$true_sog[i] <- shot_report$shots_on_goal_plus_goals
+      
+      # Print a progress update every 50 rows so you know it hasn't frozen
+      if (i %% 50 == 0) {
+        print(paste("Successfully processed", i, "of", nrow(train_data), "rows..."))
+      }
+      
+    }, error = function(e) {
+      message(paste("  -> API Error on row", i, "| Game ID:", train_data$game_id[i], "- Skipping."))
+    })
+  }
+}
 ```
 
 
 # Creating Full Training Dataset
 ```{r, warning=F}
-start_date <- as.Date('2025-12-17')
-end_date <- as.Date('2025-12-20')
+start_date <- as.Date('2026-01-01')
+end_date <- as.Date('2026-03-24')
 train <- data.frame()
 
 for(i in seq(start_date, end_date, by='day')){
-  temp3 <- get_daily_game_reports(as.Date(i))
-  #print(temp3)
-  train <- rbind(train, temp3)
+  print(as.Date(i))
+  temp3 <- tryCatch({
+    get_daily_game_reports(as.Date(i))
+  }, error = function(e) {
+    message("  -> No games scheduled or API error. Skipping.")
+    return(NULL) 
+  })
+  if(!is.null(temp3) && is.data.frame(temp3) && nrow(temp3) > 0) {
+    train <- rbind(train, temp3)
+  }
 }
 train
 #train[,c('team', 'true_sog')]
-wk9 <- train
+train_data_26 <- train
+write.csv(train_data_26, 'train_data_26.csv', row.names = F)
 
 
-train_data <- rbind(wk1, wk2, wk3, wk4, wk5, wk6, wk7, wk8, wk9)
-train_data
-# Start Date - 2025-10-26
-# End Date - 2025-12-20
+train_data_25 <- rbind(wk1, wk2, wk3, wk4, wk5, wk6)
+train_data <- rbind(train_data_25, train_data_26)
+# train_data_25 - 2025-11-01 - 2025-12-31
+
 
 train_data$sog_trend <- train_data$l4_sog - train_data$l8_sog
 train_data$sog_ag_trend <- train_data$l4_sog_ag - train_data$l8_sog_ag
@@ -498,8 +565,22 @@ train_data$shot_perc_ag <- train_data$l8_sog_ag / train_data$l8_sa_ag
 train_data
 save(train_data, file="train_data.RData")
 
-red_train <- train_data %>% dplyr::select('game_id', 'team', 'opponent', 'l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'rest_diff', 'true_sog', 'sog_trend', 'sog_ag_trend', 'home', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+red_train <- train_data %>% dplyr::select('game_id', 'team', 'opponent', 'l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'l8_blocks', 'l8_blocks_ag', 'is_b2b', 'opp_is_b2b', 'true_sog', 'sog_trend', 'sog_ag_trend', 'home', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
 #head(red_train)
+
+
+if("gameDate" %in% names(train_data)) {
+  train_data <- train_data %>%
+    arrange(team, gameDate) %>%
+    group_by(team) %>%
+    mutate(
+      days_since_last_game = as.numeric(gameDate - lag(gameDate)) - 1,
+      is_b2b = ifelse(!is.na(days_since_last_game) & days_since_last_game == 0, 1, 0)
+    ) %>%
+    ungroup()
+}
+train_data
+
 ```
 
 # PCA
@@ -524,7 +605,7 @@ plot(cumsum(pve), xlab="Principal Component ",
 
 # Scaling
 ```{r}
-num_vars <- c('l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'rest_diff', 'sog_trend', 'sog_ag_trend', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+num_vars <- c('l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'l8_blocks', 'l8_blocks_ag', 'is_b2b', 'opp_is_b2b', 'sog_trend', 'sog_ag_trend', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
 set.seed(42)
 
 train_idx <- createDataPartition(red_train$true_sog, p=.8, list=F)
@@ -684,7 +765,7 @@ daily_reports$shot_perc <- daily_reports$l8_sog / daily_reports$l8_sa
 daily_reports$shot_perc_ag <- daily_reports$l8_sog_ag / daily_reports$l8_sa_ag
 daily_reports$pred_sog <- NA
 daily_report_red <- daily_reports %>% 
-  dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
+  dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'is_b2b', 'opp_is_b2b', 'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
 daily_report_red
 predictors <- c('l8_sog', 'sog_trend', 'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 'shot_perc', 'shot_perc_ag')
 
