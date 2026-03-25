@@ -275,7 +275,7 @@ tryCatch({
     cards_html <- apply(games_df, 1, function(row) {
       
 
-      build_team_column <- function(team, proj_sog, goalie, line, edge, proj_saves) {
+      build_team_column <- function(team, proj_sog, goalie, line, edge, proj_saves, b2b_badge, edge_bar) {
         line_num <- suppressWarnings(as.numeric(line))
         edge_num <- suppressWarnings(as.numeric(edge))
         proj_saves_num <- suppressWarnings(as.numeric(proj_saves))
