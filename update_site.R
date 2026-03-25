@@ -85,80 +85,98 @@ tryCatch({
     location = ifelse(home == 1, 'vs', '@')
   )
 
-  # API Pull
+# API Pull
   API_KEY <- Sys.getenv("ODDS_API_KEY")
 
   if (API_KEY == "") {
     warning("API key not found.")
   }
     
-  goalie_data <- data.frame(fullName = character(), goalie_name = character(), vegas_saves = numeric())
-  totals_data <- data.frame(fullName = character(), vegas_goals = numeric())
-    
-  tryCatch({
-    events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
-    events <- jsonlite::fromJSON(url(events_url))
-    
-    if(length(events) > 0) {
-      for(i in 1:nrow(events)) {
-        event_id <- events$id[i]
-        
-        odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_total_saves,team_totals&bookmakers=caesars,draftkings,fanduel,betmgm")
-        odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
-        
-        if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
-          
-          # Loop through whichever bookmakers the API returned
-          for(b in 1:nrow(odds_resp$bookmakers)) {
-             mkts <- odds_resp$bookmakers$markets[[b]]
-             
-             if(length(mkts) > 0) {
-                for(m in 1:nrow(mkts)) {
-                  key <- mkts$key[m]
-                  outcomes <- mkts$outcomes[[m]]
-                  
-                  # Get Goalie Saves
-                  if(key == "player_total_saves" && "description" %in% names(outcomes)) {
-                    game_goalies <- data.frame(
-                      fullName = outcomes$description, 
-                      goalie_name = outcomes$name,     
-                      vegas_saves = as.numeric(outcomes$point) 
-                    )
-                    goalie_data <- rbind(goalie_data, game_goalies)
-                  }
-                  
-                  # Get Team Totals
-                  if(key == "team_totals" && "description" %in% names(outcomes)) {
-                    t_tots <- outcomes[!duplicated(outcomes$description), ]
-                    game_totals <- data.frame(
-                      fullName = t_tots$description,
-                      vegas_goals = as.numeric(t_tots$point)
-                    )
-                    totals_data <- rbind(totals_data, game_totals)
-                  }
-                }
-             }
-          }
-        }
-        Sys.sleep(0.2)
-      }
-    } 
-  }, error = function(e) { print(paste("Betting API Error:", e$message)) })
-
-
-  # Cache System
-  cache_file <- "odds_cache.rds"
+  goalie_data <- data.frame(fullName = character(), goalie_name = character(), vegas_saves = numeric(), event_id = character())
+  totals_data <- data.frame(fullName = character(), vegas_goals = numeric(), event_id = character())
   
+  cache_file <- "odds_cache.rds"
+  skip_api <- FALSE
+
   if(file.exists(cache_file)) {
     cache <- readRDS(cache_file)
-    
     if(cache$date == today) {
-      goalie_data <- bind_rows(goalie_data, cache$goalies) %>%
-        distinct(fullName, .keep_all = TRUE)
+      goalie_data <- cache$goalies
+      totals_data <- cache$totals
       
-      totals_data <- bind_rows(totals_data, cache$totals) %>%
-        distinct(fullName, .keep_all = TRUE)
+      expected_goalies <- nrow(daily_reports) * 2
+      if(nrow(goalie_data) >= expected_goalies) {
+        skip_api <- TRUE
+        print(paste("All", expected_goalies, "goalie lines cached. Skipping Odds API completely."))
+      }
     }
+  }
+
+  if(!skip_api && API_KEY != "") {
+    print("Checking for missing goalie lines...")
+    tryCatch({
+      events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
+      events <- jsonlite::fromJSON(url(events_url))
+      
+      if(length(events) > 0) {
+        for(i in 1:nrow(events)) {
+          event_id <- events$id[i]
+          
+
+          if ("event_id" %in% names(goalie_data)) {
+            cached_goalies_for_game <- sum(goalie_data$event_id == event_id, na.rm = TRUE)
+            if (cached_goalies_for_game >= 2) {
+              print(paste("Skipping", events$home_team[i], "vs", events$away_team[i], "- already cached."))
+              next 
+            }
+          }
+          
+          print(paste("Pulling odds for:", events$home_team[i], "vs", events$away_team[i]))
+          
+          odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_total_saves,team_totals&bookmakers=caesars,draftkings,fanduel,betmgm")
+          odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
+          
+          if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
+            for(b in 1:nrow(odds_resp$bookmakers)) {
+               mkts <- odds_resp$bookmakers$markets[[b]]
+               
+               if(length(mkts) > 0) {
+                  for(m in 1:nrow(mkts)) {
+                    key <- mkts$key[m]
+                    outcomes <- mkts$outcomes[[m]]
+                    
+                    if(key == "player_total_saves" && "description" %in% names(outcomes)) {
+                      game_goalies <- data.frame(
+                        fullName = outcomes$description, 
+                        goalie_name = outcomes$name,     
+                        vegas_saves = as.numeric(outcomes$point),
+                        event_id = event_id 
+                      )
+                      goalie_data <- rbind(goalie_data, game_goalies)
+                    }
+                    
+                    if(key == "team_totals" && "description" %in% names(outcomes)) {
+                      t_tots <- outcomes[!duplicated(outcomes$description), ]
+                      game_totals <- data.frame(
+                        fullName = t_tots$description,
+                        vegas_goals = as.numeric(t_tots$point),
+                        event_id = event_id 
+                      )
+                      totals_data <- rbind(totals_data, game_totals)
+                    }
+                  }
+               }
+            }
+          }
+          Sys.sleep(0.2)
+        }
+      } 
+    }, error = function(e) { print(paste("Betting API Error:", e$message)) })
+
+    goalie_data <- goalie_data %>% distinct(fullName, .keep_all = TRUE)
+    totals_data <- totals_data %>% distinct(fullName, .keep_all = TRUE)
+    
+    saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
   }
 
   team_map <- teams %>% dplyr::select(fullName, triCode)
