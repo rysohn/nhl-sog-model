@@ -62,18 +62,19 @@ tryCatch({
   daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
 
   # Floor / Ceiling
-  mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
-  theta <- getME(nb_fit, "glmer.nb.theta")
+  #mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
+  #raw_theta <- getME(nb_fit, "glmer.nb.theta")
+  #sim_theta <- raw_theta * 0.7
 
-  set.seed(42)
-  simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
+  #set.seed(42)
+  #simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
 
-  for(i in 1:length(mu_pred)){
-    simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=theta)
-  }
+  #for(i in 1:length(mu_pred)){
+  #  simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=sim_theta)
+  #}
 
-  daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
-  daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
+  #daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
+  #daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
 
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
@@ -221,14 +222,7 @@ tryCatch({
     daily_report_red_scaled$vegas_goals <- NA
   }
 
-  # Calculate Expected Saves
-  daily_report_red_scaled <- daily_report_red_scaled %>%
-  mutate(
-    exp_goalie_saves = pred_sog - vegas_goals,
-    edge = exp_goalie_saves - vegas_saves
-  )
-
-# NHL Team Primary Colors
+  # NHL Team Primary Colors
   nhl_colors <- c(
     "ANA"="#F47A38", "BOS"="#FFB81C", "BUF"="#002654", "CGY"="#C8102E", 
     "CAR"="#CE1126", "CHI"="#CF0A2C", "COL"="#6F263D", "CBJ"="#002654", 
@@ -239,6 +233,35 @@ tryCatch({
     "STL"="#002F87", "TBL"="#002868", "TOR"="#00205B", "UTA"="#71AFE5", 
     "VAN"="#00205B", "VGK"="#B4975A", "WSH"="#C8102E", "WPG"="#041E42"
   )
+
+
+  # Calculate Expected Saves
+  daily_report_red_scaled <- daily_report_red_scaled %>%
+  mutate(
+    exp_goalie_saves = pred_sog - vegas_goals,
+    edge = exp_goalie_saves - vegas_saves,
+    team_hex = nhl_colors[team],
+    
+    b2b_badge = ifelse(is_b2b == 1, 
+                       paste0("<span style='background-color: ", team_hex, "; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 8px; vertical-align: middle; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);'>TIRED</span>"), 
+                       ""),
+    
+    bar_width_pct = pmin((abs(edge) / 5.0) * 50, 50),
+    
+    bar_color = ifelse(is.na(edge), "transparent", ifelse(edge > 0, "#00ffcc", "#ff4c4c")),
+    
+
+    bar_anchor = ifelse(is.na(edge), "", ifelse(edge > 0, "left: 50%;", "right: 50%;")),
+    
+    edge_bar = ifelse(is.na(edge), "", paste0(
+      "<div style='position: relative; width: 100%; background-color: #2a2a2a; border-radius: 4px; margin-top: 10px; height: 6px; overflow: hidden;'>",
+        "<div style='position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background-color: #555; z-index: 2;'></div>",
+        "<div style='position: absolute; ", bar_anchor, " width: ", bar_width_pct, "%; background-color: ", bar_color, "; height: 100%; border-radius: 4px; transition: width 0.5s ease; z-index: 1;'></div>",
+      "</div>"
+    ))
+  )
+
+
 
 
 # --- HTML Output ---
@@ -281,28 +304,30 @@ tryCatch({
         paste0(
           "<div class='team-col'>",
             "<img src='", logo_url, "' class='team-logo'>",
-            "<div class='team-tricode'>", team, "</div>",
+            "<div class='team-tricode'>", team, ifelse(is.na(b2b_badge), "", b2b_badge), "</div>",
             "<div class='data-row'><span>Proj SOG</span><span class='val'>", round(as.numeric(proj_sog), 1), "</span></div>",
             "<div class='divider-sub'></div>",
             "<div class='goalie-name'>", goalie_display, "</div>",
             "<div class='data-row'><span>Line</span><span class='val'>", line_display, "</span></div>",
             "<div class='data-row'><span>Proj Saves</span><span class='val'>", proj_saves_display, "</span></div>",
             "<div class='data-row'><span>Edge</span><span class='val edge-val' style='color:", edge_color, ";'>", edge_display, "</span></div>",
+            ifelse(is.na(edge_bar), "", edge_bar),
           "</div>"
         )
       }
       
-
       away_html <- build_team_column(
         row["team_away"], row["pred_sog_away"], 
         row["goalie_name_away"], row["vegas_saves_away"], 
-        row["edge_away"], row["exp_goalie_saves_away"]
+        row["edge_away"], row["exp_goalie_saves_away"],
+        row["b2b_badge_away"], row["edge_bar_away"]
       )
       
       home_html <- build_team_column(
         row["team_home"], row["pred_sog_home"], 
         row["goalie_name_home"], row["vegas_saves_home"], 
-        row["edge_home"], row["exp_goalie_saves_home"]
+        row["edge_home"], row["exp_goalie_saves_home"],
+        row["b2b_badge_home"], row["edge_bar_home"]
       )
       
       color_away <- ifelse(row["team_away"] %in% names(nhl_colors), nhl_colors[row["team_away"]], "#ffffff")
