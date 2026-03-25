@@ -155,7 +155,7 @@ tryCatch({
                         vegas_saves = as.numeric(outcomes$point),
                         event_id = event_id 
                       )
-                      goalie_data <- rbind(goalie_data, game_goalies)
+                      goalie_data <- bind_rows(goalie_data, game_goalies)
                     }
                     
                     if(key == "team_totals" && "description" %in% names(outcomes)) {
@@ -165,7 +165,7 @@ tryCatch({
                         vegas_goals = as.numeric(t_tots$point),
                         event_id = event_id 
                       )
-                      totals_data <- rbind(totals_data, game_totals)
+                      totals_data <- bind_rows(totals_data, game_totals)
                     }
                   }
                }
