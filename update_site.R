@@ -51,6 +51,7 @@ tryCatch({
   daily_report_red[miss_vars] <- 0
   
   daily_report_red_scaled <- daily_report_red
+  daily_report_red_scaled$is_b2b_raw <- daily_report_red$is_b2b
   daily_report_red_scaled[req_vars] <- predict(scaler, daily_report_red[req_vars])
   
   daily_report_red_scaled <- daily_report_red_scaled %>%
@@ -242,8 +243,8 @@ tryCatch({
     edge = exp_goalie_saves - vegas_saves,
     team_hex = nhl_colors[team],
     
-    b2b_badge = ifelse(is_b2b == 1, 
-                       paste0("<span style='background-color: ", team_hex, "; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 8px; vertical-align: middle; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);'>TIRED</span>"), 
+    b2b_badge = ifelse(!is.na(is_b2b_raw) & is_b2b_raw == 1, 
+                       paste0("<span style='background-color: ", unname(team_hex), "; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 8px; vertical-align: middle; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);'>TIRED</span>"), 
                        ""),
     
     bar_width_pct = pmin((abs(edge) / 5.0) * 50, 50),
@@ -301,10 +302,13 @@ tryCatch({
         logo_url <- paste0("https://assets.nhle.com/logos/nhl/svg/", team, "_dark.svg")
         goalie_display <- ifelse(is.na(goalie), "Unconfirmed", goalie)
         
+        b2b_clean <- trimws(as.character(b2b_badge))
+        b2b_display <- ifelse(is.na(b2b_clean) | b2b_clean %in% c("", "NA"), "", b2b_clean)
+
         paste0(
           "<div class='team-col'>",
             "<img src='", logo_url, "' class='team-logo'>",
-            "<div class='team-tricode'>", team, ifelse(is.na(b2b_badge), "", b2b_badge), "</div>",
+            "<div class='team-tricode'>", team, b2b_display, "</div>",
             "<div class='data-row'><span>Proj SOG</span><span class='val'>", round(as.numeric(proj_sog), 1), "</span></div>",
             "<div class='divider-sub'></div>",
             "<div class='goalie-name'>", goalie_display, "</div>",
