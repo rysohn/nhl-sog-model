@@ -234,7 +234,7 @@ tryCatch({
       }
     }
 
-    goalie_data <- goalie_data %>% 
+    goalie_data_mapped <- goalie_data %>% 
       filter(!is.na(opponent)) %>% 
       distinct(opponent, .keep_all = TRUE) 
   }
@@ -243,7 +243,7 @@ tryCatch({
 
   if(nrow(goalie_data) > 0) {
     
-    goalie_data_clean <- goalie_data %>%
+    goalie_data_clean <- goalie_data_mapped %>%
       dplyr::select(-goalie_name) %>% 
       rename(goalie_name = fullName)
     
@@ -393,7 +393,7 @@ tryCatch({
     full_html <- paste0(
       "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>",
       "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
-      "<title>NHL Prop Projections</title>",
+      "<title>NHL Shot Projections</title>",
       "<style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { 
