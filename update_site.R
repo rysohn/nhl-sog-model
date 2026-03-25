@@ -244,7 +244,7 @@ tryCatch({
     team_hex = nhl_colors[team],
     
     b2b_badge = ifelse(!is.na(is_b2b_raw) & is_b2b_raw == 1, 
-                       paste0("<span style='background-color: ", unname(team_hex), "; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 8px; vertical-align: middle; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);'>TIRED</span>"), 
+                       paste0("<span style='background-color: ", unname(team_hex), "; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 8px; vertical-align: middle; text-shadow: 0px 1px 3px rgba(0,0,0,0.8);'>B2B</span>"), 
                        ""),
     
     bar_width_pct = pmin((abs(edge) / 5.0) * 50, 50),
