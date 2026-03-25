@@ -160,14 +160,7 @@ tryCatch({
     }
   }
 
-  all_teams <- nhlscraper::teams() 
-  
-  full_name_col <- if("fullName" %in% names(all_teams)) "fullName" else "full_name"
-  tri_code_col <- if("triCode" %in% names(all_teams)) "triCode" else "tri_code"
-  
-  team_map <- all_teams %>% 
-    dplyr::select(all_of(c(full_name_col, tri_code_col))) %>%
-    rename(fullName = !!sym(full_name_col), triCode = !!sym(tri_code_col))
+  team_map <- teams %>% dplyr::select(fullName, triCode)
     
   if(nrow(goalie_data) > 0) {
     goalie_map <- data.frame()

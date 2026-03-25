@@ -25,7 +25,14 @@ jobs:
       - name: Install R packages
         run: |
           options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
-          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr', 'jsonlite', 'nhlscraper'))
+          # Ensure 'remotes' is installed here
+          install.packages(c('tidyverse', 'MASS', 'caret', 'gt', 'remotes', 'lme4', 'cluster', 'Metrics', 'glmnet', 'httr', 'jsonlite'))
+        shell: Rscript {0}
+
+      - name: Install nhlscraper 0.2.0
+        run: |
+          # This pulls specifically version 0.2.0 from the CRAN archive
+          remotes::install_version("nhlscraper", version = "0.2.0", repos = "http://cran.us.r-project.org", upgrade = "never")
         shell: Rscript {0}
 
       - name: Run Model
