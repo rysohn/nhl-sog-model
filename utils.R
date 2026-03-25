@@ -162,14 +162,14 @@ get_full_home_preds <- function(tricode, date){
   ha_split <- get_home_splits(tricode, date)
   
   l8_log <- l8_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots, l8_blocks = blocked_shots)
   l4_log <- l4_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots, l4_blocks = blocked_shots)
   ha_split <- ha_split %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots, ha_blocks = blocked_shots)
   
   shot_preds <- cbind(l8_log, l4_log, ha_split)
   return(shot_preds)
@@ -182,14 +182,14 @@ get_full_away_preds <- function(tricode, date){
   ha_split    <- get_away_splits(tricode, date)
   
   l8_log <- l8_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l8_sa = total_shot_attempts, l8_sog = shots_on_goal_plus_goals, l8_miss = missed_shots, l8_blocks = blocked_shots)
   l4_log <- l4_log %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(l4_sa = total_shot_attempts, l4_sog = shots_on_goal_plus_goals, l4_miss = missed_shots, l4_blocks = blocked_shots)
   ha_split <- ha_split %>%
-    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots) %>%
-    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots)
+    dplyr::select(total_shot_attempts, shots_on_goal_plus_goals, missed_shots, blocked_shots) %>%
+    rename(ha_sa = total_shot_attempts, ha_sog = shots_on_goal_plus_goals, ha_miss = missed_shots, ha_blocks = blocked_shots)
   
   shot_preds <- cbind(l8_log, l4_log, ha_split)
   return(shot_preds)
@@ -288,14 +288,14 @@ get_full_against_home_preds <- function(tricode, date){
   home_against <- get_home_allowed_splits(tricode, date)
   
   l8_against <- l8_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots, l8_blocks_ag = blocked_shots)
   l4_against <- l4_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots, l4_blocks_ag = blocked_shots)
   home_against <- home_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots, ha_blocks_ag = blocked_shots)
   
   shot_against_preds <- cbind(l8_against, l4_against, home_against)
   return(shot_against_preds)
@@ -308,14 +308,14 @@ get_full_against_away_preds <- function(tricode, date){
   away_against <- get_away_allowed_splits(tricode, date)
   
   l8_against <- l8_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l8_sa_ag = total_shot_attempts, l8_sog_ag = shots_on_goal_plus_goals, l8_miss_ag = missed_shots, l8_blocks_ag = blocked_shots)
   l4_against <- l4_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(l4_sa_ag = total_shot_attempts, l4_sog_ag = shots_on_goal_plus_goals, l4_miss_ag = missed_shots, l4_blocks_ag = blocked_shots)
   away_against <- away_against %>%
-    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots'))) %>%
-    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots)
+    dplyr::select(all_of(c('total_shot_attempts', 'shots_on_goal_plus_goals', 'missed_shots', 'blocked_shots'))) %>%
+    rename(ha_sa_ag = total_shot_attempts, ha_sog_ag = shots_on_goal_plus_goals, ha_miss_ag = missed_shots, ha_blocks_ag = blocked_shots)
   
   shot_against_preds <- cbind(l8_against, l4_against, away_against)
   return(shot_against_preds)
@@ -395,9 +395,9 @@ get_daily_game_reports <- function(date) {
   df2 <- data.frame(game_id = slate[,1], team = slate[,7], opponent = slate[,5], ha='away')
   names(df2) <- c('game_id', 'team', 'opponent', 'h/a')
   games <- rbind(df, df2)
-  games[c('l8_sa', 'l8_sog', 'l8_miss', 'l4_sa', 'l4_sog', 'l4_miss', 'ha_sa', 'ha_sog', 'ha_miss',
-          'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 
-          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'is_b2b', 'true_sog')] <- NA
+  games[c('l8_sa', 'l8_sog', 'l8_miss', 'l8_blocks', 'l4_sa', 'l4_sog', 'l4_miss', 'l4_blocks', 'ha_sa', 'ha_sog', 'ha_miss', 'ha_blocks',
+          'l8_sa_ag', 'l8_sog_ag', 'l8_miss_ag', 'l8_blocks_ag', 'l4_sa_ag', 'l4_sog_ag', 'l4_miss_ag', 'l4_blocks_ag', 
+          'ha_sa_ag', 'ha_sog_ag', 'ha_miss_ag', 'ha_blocks_ag', 'is_b2b', 'opp_is_b2b', 'true_sog')] <- NA
   #return(games)
   temp4 <- 0
   for (i in 1:nrow(games)) {
@@ -420,7 +420,8 @@ get_daily_game_reports <- function(date) {
       games[i, common_cols_2] <- temp2[1, common_cols_2]
     }
     games$is_b2b[i] <- get_b2b(games$game_id[i], games$team[i])
-    if (date >= Sys.Date()){
+    games$opp_is_b2b[i] <- get_b2b(games$game_id[i], games$opponent[i])
+    if (date <= Sys.Date()){
       tid <- get_team_id(games$team[i])
       true_sog <- get_game_shot_report(games$game_id[i], tid)
       games$true_sog[i] <- true_sog$shots_on_goal_plus_goals

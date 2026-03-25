@@ -498,20 +498,20 @@ daily_reports
 
 
 ```{r}
-for (i in 1:nrow(train_data_25)) {
+for (i in 1:nrow(train_data)) {
   
   # Only ping the API if the true_sog is actually missing
-  if (is.na(train_data_25$true_sog[i])) {
+  if (is.na(train_data$true_sog[i])) {
     
     # Wrap in tryCatch so a single corrupted game doesn't crash the whole 10-minute loop
     tryCatch({
       
       # Grab the team ID and hit the play-by-play endpoint
-      tid <- get_team_id(train_data_25$team[i])
-      shot_report <- get_game_shot_report(train_data_25$game_id[i], tid)
+      tid <- get_team_id(train_data$team[i])
+      shot_report <- get_game_shot_report(train_data$game_id[i], tid)
       
       # Inject the actual shots back into the dataframe
-      train_data_25$true_sog[i] <- shot_report$shots_on_goal_plus_goals
+      train_data$true_sog[i] <- shot_report$shots_on_goal_plus_goals
       
       # Print a progress update every 50 rows so you know it hasn't frozen
       if (i %% 50 == 0) {
@@ -547,7 +547,7 @@ for(i in seq(start_date, end_date, by='day')){
 train
 #train[,c('team', 'true_sog')]
 train_data_26 <- train
-write.csv(train_data_26, 'train_data_26.csv', row.names = F)
+write.csv(train_data_25_26, 'train_data_25_26.csv', row.names = F)
 
 
 train_data_25 <- rbind(wk1, wk2, wk3, wk4, wk5, wk6)
@@ -562,25 +562,19 @@ train_data$off_def_gap <- train_data$l8_sog - train_data$l8_sog_ag
 train_data$pace <- train_data$l8_sog + train_data$l8_sog_ag
 train_data$shot_perc <- train_data$l8_sog / train_data$l8_sa
 train_data$shot_perc_ag <- train_data$l8_sog_ag / train_data$l8_sa_ag
+train_data_25_26$blocks_perc <- train_data_25_26$l8_blocks / train_data_25_26$l8_sa
+train_data_25_26$blocks_perc_ag <- train_data_25_26$l8_blocks_ag / train_data_25_26$l8_sa_ag
 train_data
 save(train_data, file="train_data.RData")
 
-red_train <- train_data %>% dplyr::select('game_id', 'team', 'opponent', 'l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'l8_blocks', 'l8_blocks_ag', 'is_b2b', 'opp_is_b2b', 'true_sog', 'sog_trend', 'sog_ag_trend', 'home', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+red_train_25_26 <- train_data_25_26 %>% dplyr::select('game_id', 'team', 'opponent', 'l8_sa', 'l8_sa_ag', 'l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'blocks_perc', 'blocks_perc_ag', 'is_b2b', 'opp_is_b2b', 'true_sog', 'sog_trend', 'sog_ag_trend', 'home', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
 #head(red_train)
 
 
-if("gameDate" %in% names(train_data)) {
-  train_data <- train_data %>%
-    arrange(team, gameDate) %>%
-    group_by(team) %>%
-    mutate(
-      days_since_last_game = as.numeric(gameDate - lag(gameDate)) - 1,
-      is_b2b = ifelse(!is.na(days_since_last_game) & days_since_last_game == 0, 1, 0)
-    ) %>%
-    ungroup()
-}
-train_data
+train_data_25_26 <- train_data %>%
+  drop_na(true_sog)
 
+colnames(train_data_25_26)
 ```
 
 # PCA
@@ -605,13 +599,13 @@ plot(cumsum(pve), xlab="Principal Component ",
 
 # Scaling
 ```{r}
-num_vars <- c('l8_sog', 'l4_sog', 'ha_sog', 'l8_sog_ag', 'l4_sog_ag', 'ha_sog_ag', 'l8_blocks', 'l8_blocks_ag', 'is_b2b', 'opp_is_b2b', 'sog_trend', 'sog_ag_trend', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
+num_vars <- c('l8_sa', 'l4_sog', 'ha_sog', 'l8_sa_ag', 'l4_sog_ag', 'ha_sog_ag', 'blocks_perc', 'blocks_perc_ag', 'is_b2b', 'opp_is_b2b', 'sog_trend', 'sog_ag_trend', 'off_def_gap', 'pace', 'shot_perc', 'shot_perc_ag')
 set.seed(42)
 
-train_idx <- createDataPartition(red_train$true_sog, p=.8, list=F)
+train_idx <- createDataPartition(red_train_25_26$true_sog, p=.8, list=F)
 
-train <- red_train[train_idx, ]
-test <- red_train[-train_idx, ]
+train <- red_train_25_26[train_idx, ]
+test <- red_train_25_26[-train_idx, ]
 
 scaler <- preProcess(train[, num_vars], method=c('center', 'scale'))
 
@@ -626,11 +620,13 @@ summary(train_scaled[,num_vars])
 
 # Model V1
 ```{r}
-nb_fit <- glm.nb(true_sog ~ l8_sog + sog_trend + l8_sog_ag + sog_ag_trend + rest_diff
-                 + shot_perc + shot_perc_ag + home, data=train_scaled)
+nb_fit <- glm.nb(true_sog ~ l8_sa + l8_sa_ag + is_b2b + opp_is_b2b +
+                 + shot_perc + shot_perc_ag + home + blocks_perc + blocks_perc_ag, 
+                 data=train_scaled)
 
 summary(nb_fit)
 nb_fit$theta
+print(1 - (nb_fit$deviance / nb_fit$null.deviance))
 
 
 x_train <- model.matrix(true_sog ~ l8_sog + sog_trend + l8_sog_ag + sog_ag_trend + rest_diff
@@ -659,21 +655,46 @@ exp(coef(nb_fit))
 
 # Model V2
 ```{r}
-re_fit <- glm.nb(
+re_fit <- glmer.nb(
   true_sog ~ 
-    l8_sog + l8_sog_ag + sog_ag_trend +
-    shot_perc + shot_perc_ag + rest_diff + home +
-    factor(team) + factor(opponent),
+    l8_sa + blocks_perc_ag + home + shot_perc +
+    is_b2b + opp_is_b2b + (1 | team) + (1 | opponent),
   data = train_scaled
 )
 summary(re_fit)
+
+print(cor(predict(re_fit, type="response"), train_scaled$true_sog)^2)
 ```
+```{r}
+# 1. Generate the exact predictions for your training dataset
+train_scaled$pred_sog <- predict(re_fit, type = "response")
+
+# 2. Calculate both the Absolute Error (magnitude) and Raw Error (direction)
+train_scaled <- train_scaled %>%
+  mutate(
+    abs_error = abs(true_sog - pred_sog),
+    raw_error = pred_sog - true_sog 
+    # Positive raw_error = Model over-predicted (expected too many shots)
+    # Negative raw_error = Model under-predicted (didn't expect enough shots)
+  )
+
+# 3. Filter for the top 20 biggest misses and grab the vital columns
+worst_predictions <- train_scaled %>%
+  dplyr::select(game_id, team, opponent, true_sog, pred_sog, raw_error, abs_error) %>%
+  arrange(desc(abs_error)) %>%
+  head(20)
+
+# 4. Print the dataframe so you can inspect it
+print(worst_predictions)
+
+```
+
 
 
 # Test Data (w/ team effects)
 ```{r}
 test_scaled$pred_sog <- predict(re_fit, newdata=test_scaled, type='response')
-test_scaled$pred_sog
+#test_scaled$pred_sog
 
 rmse_val <- sqrt(mean((test_scaled$true_sog - test_scaled$pred_sog)^2))
 mae_val  <- mean(abs(test_scaled$true_sog - test_scaled$pred_sog))
@@ -749,7 +770,7 @@ mae_baseline
 
 # Model Save
 ```{r}
-saveRDS(nb_fit, 'nb_sog_model.rds')
+saveRDS(re_fit, 'nb_sog_model.rds')
 saveRDS(scaler, "sog_scaler.rds")
 
 ```

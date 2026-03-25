@@ -38,13 +38,12 @@ tryCatch({
   daily_reports$sog_ag_trend <- daily_reports$l4_sog_ag - daily_reports$l8_sog_ag
   daily_reports$home <- ifelse(daily_reports$'h/a' == 'home', 1, 0)
   daily_reports$shot_perc <- daily_reports$l8_sog / daily_reports$l8_sa
-  daily_reports$shot_perc_ag <- daily_reports$l8_sog_ag / daily_reports$l8_sa_ag
+  daily_reports$blocks_perc_ag <- daily_reports$l8_blocks_ag / daily_reports$l8_sa_ag
   daily_reports$pred_sog <- NA
   
   daily_report_red <- daily_reports %>% 
-    dplyr::select(c('game_id', 'team', 'opponent', 'l8_sog', 'sog_trend', 
-                    'l8_sog_ag', 'sog_ag_trend', 'rest_diff', 
-                    'shot_perc', 'shot_perc_ag', 'home', 'pred_sog'))
+    dplyr::select(c('game_id', 'team', 'opponent', 'l8_sa', 'blocks_perc_ag', 'shot_perc',
+                    'home', 'is_b2b', 'opp_is_b2b', 'pred_sog'))
   
   # Scaling
   req_vars <- scaler$method$center
@@ -70,7 +69,7 @@ tryCatch({
 
   # Floor / Ceiling
   mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
-  theta <- nb_fit$theta
+  theta <- getME(nb_fit, "glmer.nb.theta")
 
   set.seed(42)
   simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
@@ -82,7 +81,6 @@ tryCatch({
   daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
   daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
 
-  # CRITICAL FIX 1: Removed team_id function entirely
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
