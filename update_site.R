@@ -56,7 +56,7 @@ tryCatch({
   
   daily_report_red_scaled <- daily_report_red_scaled %>%
     dplyr::select(all_of(c('game_id', 'team', 'opponent', 'l8_sa', 'blocks_perc_ag', 'shot_perc',
-                           'home', 'is_b2b', 'opp_is_b2b', 'pred_sog')))
+                           'home', 'is_b2b', 'opp_is_b2b', 'pred_sog', 'is_b2b_raw')))
 
   # Prediction
   daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
