@@ -117,61 +117,81 @@ tryCatch({
 
   if(!skip_api && API_KEY != "") {
     print("Checking for missing goalie lines...")
+
+    all_teams <- nhlscraper::teams() 
+    full_name_col <- if("fullName" %in% names(all_teams)) "fullName" else "full_name"
+    tri_code_col <- if("triCode" %in% names(all_teams)) "triCode" else "tri_code"
+    
+    team_map <- all_teams %>% 
+      dplyr::select(all_of(c(full_name_col, tri_code_col))) %>%
+      rename(fullName = !!sym(full_name_col), triCode = !!sym(tri_code_col))
+      
+    teams_playing_today <- unique(daily_reports$team)
+
     tryCatch({
       events_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=", API_KEY, "&commenceTimeFrom=", format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"))
       events <- jsonlite::fromJSON(url(events_url))
       
       if(length(events) > 0) {
-        for(i in 1:nrow(events)) {
-          event_id <- events$id[i]
-          
+        events <- events %>%
+          left_join(team_map, by = c("home_team" = "fullName")) %>%
+          mutate(
+            event_date = as.Date(as.POSIXct(commence_time, format="%Y-%m-%dT%H:%M:%SZ", tz="UTC"), tz="America/New_York")
+          ) %>%
+          filter(triCode %in% teams_playing_today & event_date == today)
 
-          if ("event_id" %in% names(goalie_data)) {
-            cached_goalies_for_game <- sum(goalie_data$event_id == event_id, na.rm = TRUE)
-            if (cached_goalies_for_game >= 2) {
-              print(paste("Skipping", events$home_team[i], "vs", events$away_team[i], "- already cached."))
-              next 
+        if(nrow(events) > 0) {  
+          for(i in 1:nrow(events)) {
+            event_id <- events$id[i]
+            
+
+            if ("event_id" %in% names(goalie_data)) {
+              cached_goalies_for_game <- sum(goalie_data$event_id == event_id, na.rm = TRUE)
+              if (cached_goalies_for_game >= 2) {
+                print(paste("Skipping", events$home_team[i], "vs", events$away_team[i], "- already cached."))
+                next 
+              }
             }
-          }
-          
-          print(paste("Pulling odds for:", events$home_team[i], "vs", events$away_team[i]))
-          
-          odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_total_saves,team_totals&bookmakers=caesars,draftkings,fanduel,betmgm")
-          odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
-          
-          if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
-            for(b in 1:nrow(odds_resp$bookmakers)) {
-               mkts <- odds_resp$bookmakers$markets[[b]]
-               
-               if(length(mkts) > 0) {
-                  for(m in 1:nrow(mkts)) {
-                    key <- mkts$key[m]
-                    outcomes <- mkts$outcomes[[m]]
-                    
-                    if(key == "player_total_saves" && "description" %in% names(outcomes)) {
-                      game_goalies <- data.frame(
-                        fullName = outcomes$description, 
-                        goalie_name = outcomes$name,     
-                        vegas_saves = as.numeric(outcomes$point),
-                        event_id = event_id 
-                      )
-                      goalie_data <- bind_rows(goalie_data, game_goalies)
+            
+            print(paste("Pulling odds for:", events$home_team[i], "vs", events$away_team[i]))
+            
+            odds_url <- paste0("https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/", event_id, "/odds?apiKey=", API_KEY, "&regions=us&markets=player_total_saves,team_totals&bookmakers=caesars,draftkings,fanduel,betmgm")
+            odds_resp <- try(jsonlite::fromJSON(url(odds_url)), silent=TRUE)
+            
+            if(!inherits(odds_resp, "try-error") && length(odds_resp$bookmakers) > 0) {
+              for(b in 1:nrow(odds_resp$bookmakers)) {
+                mkts <- odds_resp$bookmakers$markets[[b]]
+                
+                if(length(mkts) > 0) {
+                    for(m in 1:nrow(mkts)) {
+                      key <- mkts$key[m]
+                      outcomes <- mkts$outcomes[[m]]
+                      
+                      if(key == "player_total_saves" && "description" %in% names(outcomes)) {
+                        game_goalies <- data.frame(
+                          fullName = outcomes$description, 
+                          goalie_name = outcomes$name,     
+                          vegas_saves = as.numeric(outcomes$point),
+                          event_id = event_id 
+                        )
+                        goalie_data <- bind_rows(goalie_data, game_goalies)
+                      }
+                      
+                      if(key == "team_totals" && "description" %in% names(outcomes)) {
+                        t_tots <- outcomes[!duplicated(outcomes$description), ]
+                        game_totals <- data.frame(
+                          fullName = t_tots$description,
+                          vegas_goals = as.numeric(t_tots$point),
+                          event_id = event_id 
+                        )
+                        totals_data <- bind_rows(totals_data, game_totals)
+                      }
                     }
-                    
-                    if(key == "team_totals" && "description" %in% names(outcomes)) {
-                      t_tots <- outcomes[!duplicated(outcomes$description), ]
-                      game_totals <- data.frame(
-                        fullName = t_tots$description,
-                        vegas_goals = as.numeric(t_tots$point),
-                        event_id = event_id 
-                      )
-                      totals_data <- bind_rows(totals_data, game_totals)
-                    }
-                  }
-               }
+                }
+              }
             }
+            Sys.sleep(0.2)
           }
-          Sys.sleep(0.2)
         }
       } 
     }, error = function(e) { print(paste("Betting API Error:", e$message)) })
