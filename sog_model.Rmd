@@ -575,6 +575,9 @@ train_data_25_26 <- train_data %>%
   drop_na(true_sog)
 
 colnames(train_data_25_26)
+
+train_data <- train_data_25_26
+save(train_data, file = "train_data.RData")
 ```
 
 # PCA
