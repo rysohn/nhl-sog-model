@@ -61,11 +61,6 @@ tryCatch({
   daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
   daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
 
-  # Amplifier
-  spread_factor <- 1.2
-  daily_report_red_scaled$pred_sog_wide <- round(mean_sog + 
-    (daily_report_red_scaled$pred_sog - mean_sog) * spread_factor, 1)
-
   # Floor / Ceiling
   mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
   theta <- getME(nb_fit, "glmer.nb.theta")
@@ -229,7 +224,7 @@ tryCatch({
   # Calculate Expected Saves
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
-    exp_goalie_saves = pred_sog_wide - vegas_goals,
+    exp_goalie_saves = pred_sog - vegas_goals,
     edge = exp_goalie_saves - vegas_saves
   )
 
@@ -299,13 +294,13 @@ tryCatch({
       
 
       away_html <- build_team_column(
-        row["team_away"], row["pred_sog_wide_away"], 
+        row["team_away"], row["pred_sog_away"], 
         row["goalie_name_away"], row["vegas_saves_away"], 
         row["edge_away"], row["exp_goalie_saves_away"]
       )
       
       home_html <- build_team_column(
-        row["team_home"], row["pred_sog_wide_home"], 
+        row["team_home"], row["pred_sog_home"], 
         row["goalie_name_home"], row["vegas_saves_home"], 
         row["edge_home"], row["exp_goalie_saves_home"]
       )
