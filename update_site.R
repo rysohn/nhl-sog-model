@@ -103,6 +103,9 @@ tryCatch({
     if(cache$date == today) {
       goalie_data <- cache$goalies
       totals_data <- cache$totals
+
+      if(!"event_id" %in% names(goalie_data)) goalie_data$event_id <- NA_character_
+      if(!"event_id" %in% names(totals_data)) totals_data$event_id <- NA_character_
       
       expected_goalies <- nrow(daily_reports) * 2
       if(nrow(goalie_data) >= expected_goalies) {
