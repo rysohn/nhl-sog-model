@@ -118,7 +118,7 @@ tryCatch({
   if(!skip_api && API_KEY != "") {
     print("Checking for missing goalie lines...")
 
-    all_teams <- nhlscraper::teams() 
+    all_teams <- nhlscraper::get_teams() 
     full_name_col <- if("fullName" %in% names(all_teams)) "fullName" else "full_name"
     tri_code_col <- if("triCode" %in% names(all_teams)) "triCode" else "tri_code"
     
