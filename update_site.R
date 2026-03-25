@@ -196,8 +196,8 @@ tryCatch({
       } 
     }, error = function(e) { print(paste("Betting API Error:", e$message)) })
 
-    goalie_data <- goalie_data %>% distinct(fullName, .keep_all = TRUE)
-    totals_data <- totals_data %>% distinct(fullName, .keep_all = TRUE)
+    goalie_data <- goalie_data %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
+    totals_data <- totals_data %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
     
     saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
   }
