@@ -335,15 +335,13 @@ tryCatch({
         edge_num <- suppressWarnings(as.numeric(edge))
         proj_saves_num <- suppressWarnings(as.numeric(proj_saves))
         
-        if(is.na(line_num) || is.na(edge_num) || is.na(proj_saves_num)) {
-          line_display <- "--"
-          proj_saves_display <- "--"
+        line_display <- ifelse(is.na(line_num), "--", as.character(line_num))
+        proj_saves_display <- ifelse(is.na(proj_saves_num), "--", as.character(round(proj_saves_num, 1)))
+        
+        if(is.na(edge_num)) {
           edge_display <- "--"
           edge_color <- "#777777"
         } else {
-          line_display <- as.character(line_num)
-          proj_saves_display <- as.character(round(proj_saves_num, 1))
-          
           if(edge_num >= 0) {
             edge_color <- "#4CAF50" # Green
             edge_display <- paste0("+", round(edge_num, 1))
