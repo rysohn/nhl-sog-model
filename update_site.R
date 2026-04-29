@@ -234,13 +234,16 @@ tryCatch({
       }
     }
 
-    goalie_data$opponent <- NA
+    if(!"opponent" %in% names(goalie_data)) goalie_data$opponent <- NA
+
     for(i in 1:nrow(goalie_data)) {
-      g_name <- tolower(goalie_data$fullName[i])
-      match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
-        
-      if(length(match_idx) > 0) {
-        goalie_data$opponent[i] <- goalie_map$opponent[match_idx[1]]
+      if(is.na(goalie_data$opponent[i])) {
+        g_name <- tolower(goalie_data$fullName[i])
+        match_idx <- which(sapply(goalie_map$nhl_last_name, function(ln) grepl(ln, g_name)))
+          
+        if(length(match_idx) > 0) {
+          goalie_data$opponent[i] <- goalie_map$opponent[match_idx[1]]
+        }
       }
     }
 
