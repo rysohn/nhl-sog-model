@@ -660,34 +660,32 @@ exp(coef(nb_fit))
 ```{r}
 re_fit <- glmer.nb(
   true_sog ~ 
-    l8_sa + blocks_perc_ag + home + shot_perc +
+    l_sa + blocks_perc_ag + home + shot_perc +
     is_b2b + opp_is_b2b + (1 | team) + (1 | opponent),
   data = train_scaled
 )
 summary(re_fit)
+summary(resid(re_fit))
 
 print(cor(predict(re_fit, type="response"), train_scaled$true_sog)^2)
 ```
+
+
+# Largest Outliers
 ```{r}
-# 1. Generate the exact predictions for your training dataset
 train_scaled$pred_sog <- predict(re_fit, type = "response")
 
-# 2. Calculate both the Absolute Error (magnitude) and Raw Error (direction)
 train_scaled <- train_scaled %>%
   mutate(
     abs_error = abs(true_sog - pred_sog),
     raw_error = pred_sog - true_sog 
-    # Positive raw_error = Model over-predicted (expected too many shots)
-    # Negative raw_error = Model under-predicted (didn't expect enough shots)
   )
 
-# 3. Filter for the top 20 biggest misses and grab the vital columns
 worst_predictions <- train_scaled %>%
   dplyr::select(game_id, team, opponent, true_sog, pred_sog, raw_error, abs_error) %>%
   arrange(desc(abs_error)) %>%
   head(20)
 
-# 4. Print the dataframe so you can inspect it
 print(worst_predictions)
 
 ```

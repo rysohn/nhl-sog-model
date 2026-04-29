@@ -101,8 +101,8 @@ tryCatch({
   if(file.exists(cache_file)) {
     cache <- readRDS(cache_file)
     if(cache$date == today) {
-      goalie_data <- cache$goalies
-      totals_data <- cache$totals
+      goalie_data <- cache$goalies %>% filter(!is.na(vegas_saves))
+      totals_data <- cache$totals %>% filter(!is.na(vegas_goals))
 
       if(!"event_id" %in% names(goalie_data)) goalie_data$event_id <- NA_character_
       if(!"event_id" %in% names(totals_data)) totals_data$event_id <- NA_character_
@@ -196,8 +196,8 @@ tryCatch({
       } 
     }, error = function(e) { print(paste("Betting API Error:", e$message)) })
 
-    goalie_data <- goalie_data %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
-    totals_data <- totals_data %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
+    goalie_data <- goalie_data %>% filter(!is.na(vegas_saves)) %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
+    totals_data <- totals_data %>% filter(!is.na(vegas_goals)) %>% arrange(is.na(event_id)) %>% distinct(fullName, .keep_all = TRUE)
     
     saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
   }
