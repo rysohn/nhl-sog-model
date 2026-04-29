@@ -202,7 +202,14 @@ tryCatch({
     saveRDS(list(date = today, goalies = goalie_data, totals = totals_data), cache_file)
   }
 
-  team_map <- teams %>% dplyr::select(fullName, triCode)
+  all_teams_safe <- nhlscraper::get_teams() 
+  
+  full_name_col <- if("fullName" %in% names(all_teams_safe)) "fullName" else "full_name"
+  tri_code_col <- if("triCode" %in% names(all_teams_safe)) "triCode" else "tri_code"
+  
+  team_map <- all_teams_safe %>% 
+    dplyr::select(all_of(c(full_name_col, tri_code_col))) %>%
+    rename(fullName = !!sym(full_name_col), triCode = !!sym(tri_code_col))
     
   if(nrow(goalie_data) > 0) {
     goalie_map <- data.frame()
@@ -210,10 +217,13 @@ tryCatch({
         
     for(opp in unique_opps) {
       roster_url <- paste0("https://api-web.nhle.com/v1/roster/", opp, "/current")
-      roster_resp <- try(jsonlite::fromJSON(url(roster_url)), silent=TRUE)
+      
+      req <- try(httr::GET(roster_url, httr::add_headers(`User-Agent` = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")), silent=TRUE)
         
-      if(!inherits(roster_resp, "try-error") && "goalies" %in% names(roster_resp)) {
-        if(is.data.frame(roster_resp$goalies) && nrow(roster_resp$goalies) > 0) {
+      if(!inherits(req, "try-error") && req$status_code == 200) {
+        roster_resp <- jsonlite::fromJSON(httr::content(req, "text", encoding = "UTF-8"))
+        
+        if("goalies" %in% names(roster_resp) && is.data.frame(roster_resp$goalies) && nrow(roster_resp$goalies) > 0) {
           temp_map <- data.frame(
             nhl_last_name = tolower(roster_resp$goalies$lastName$default),
             opponent = opp,
