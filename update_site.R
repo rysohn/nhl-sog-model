@@ -27,7 +27,7 @@ print(paste("Running model for:", today))
 
 tryCatch({
   # 3. Fetch Games
-  daily_reports <- get_daily_game_reports(today)
+  daily_reports <- get_daily_game_reports("2026-03-12")
   
   if(nrow(daily_reports) == 0) {
     stop("No games scheduled today.")
@@ -510,7 +510,7 @@ tryCatch({
       
       "<div class='header-container'>",
         "<h1>NHL Shot Projections</h1>",
-        "<div class='subtitle'>", today, "</div>",
+        "<div class='subtitle'>", "2026-03-12", "</div>",
       "</div>",
       
       "<div class='grid-container'>",
