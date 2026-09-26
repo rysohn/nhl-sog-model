@@ -25,6 +25,64 @@ if(file.exists("train_data.RData")) {
 today <- as.Date(format(Sys.time(), tz = "America/New_York"))
 print(paste("Running model for:", today))
 
+# ==============================================================================
+# 2.5 Initialize and Update Predictions Log (Past Games)
+# ==============================================================================
+log_path <- "predictions_log.csv"
+log_cols <- c("Date", "Team", "Opponent", "Goalie", "Prediction", 
+               "Saves_Line", "Team_Total_Line", "Actual_SOG")
+
+if (!file.exists(log_path)) {
+  empty_log <- data.frame(matrix(ncol = length(log_cols), nrow = 0))
+  colnames(empty_log) <- log_cols
+  empty_log <- empty_log %>%
+    mutate(
+      Date = as.Date(Date), Team = as.character(Team), Opponent = as.character(Opponent),
+      Goalie = as.character(Goalie), Prediction = as.numeric(Prediction),
+      Saves_Line = as.numeric(Saves_Line), Team_Total_Line = as.numeric(Team_Total_Line),
+      Actual_SOG = as.numeric(Actual_SOG)
+    )
+  write_csv(empty_log, log_path)
+}
+
+historical_log <- read_csv(log_path, show_col_types = FALSE)
+
+get_nhl_data <- function(date_str) {
+  url <- paste0("https://api-web.nhle.com/v1/score/", date_str)
+  res <- try(httr::GET(url), silent=TRUE)
+  if (inherits(res, "try-error") || httr::status_code(res) != 200) return(tibble())
+  
+  data <- try(jsonlite::fromJSON(httr::content(res, "text", encoding = "UTF-8")), silent=TRUE)
+  if (inherits(data, "try-error") || length(data$games) == 0) return(tibble())
+  
+  games <- data$games
+  away_sog <- if("sog" %in% names(games$awayTeam)) games$awayTeam$sog else rep(NA, nrow(games))
+  home_sog <- if("sog" %in% names(games$homeTeam)) games$homeTeam$sog else rep(NA, nrow(games))
+  
+  bind_rows(
+    tibble(Date = as.Date(date_str), Team = games$awayTeam$abbrev, 
+           Opponent = games$homeTeam$abbrev, Actual_SOG = as.numeric(away_sog)),
+    tibble(Date = as.Date(date_str), Team = games$homeTeam$abbrev, 
+           Opponent = games$awayTeam$abbrev, Actual_SOG = as.numeric(home_sog))
+  )
+}
+
+dates_to_update <- historical_log %>%
+  filter(is.na(Actual_SOG), Date < today) %>%
+  pull(Date) %>%
+  unique()
+
+if (length(dates_to_update) > 0) {
+  actuals <- purrr::map_dfr(dates_to_update, ~get_nhl_data(as.character(.x))) %>% 
+    dplyr::select(Date, Team, Actual_SOG)
+  
+  if (nrow(actuals) > 0) {
+    historical_log <- historical_log %>%
+      rows_update(actuals %>% filter(!is.na(Actual_SOG)), by = c("Date", "Team"), unmatched = "ignore")
+    write_csv(historical_log, log_path)
+  }
+}
+
 tryCatch({
   # 3. Fetch Games
   daily_reports <- get_daily_game_reports(today)
@@ -62,21 +120,6 @@ tryCatch({
   daily_report_red_scaled$pred_sog <- predict(nb_fit, newdata=daily_report_red_scaled, type='response')
   daily_report_red_scaled$pred_sog <- round(daily_report_red_scaled$pred_sog, 1)
 
-  # Floor / Ceiling
-  #mu_pred <- as.vector(daily_report_red_scaled$pred_sog)
-  #raw_theta <- getME(nb_fit, "glmer.nb.theta")
-  #sim_theta <- raw_theta * 0.7
-
-  #set.seed(42)
-  #simulations <- matrix(NA, nrow=length(mu_pred), ncol=1000)
-
-  #for(i in 1:length(mu_pred)){
-  #  simulations[i,] <- MASS::rnegbin(1000, mu=mu_pred[i], theta=sim_theta)
-  #}
-
-  #daily_report_red_scaled$ceiling_sog <- round(apply(simulations, 1, quantile, probs=0.75, na.rm=TRUE), 1)
-  #daily_report_red_scaled$floor_sog <- round(apply(simulations, 1, quantile, probs=0.25, na.rm=TRUE), 1)
-
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
     logo_url = paste0("<img src='https://assets.nhle.com/logos/nhl/svg/", 
@@ -85,7 +128,7 @@ tryCatch({
     location = ifelse(home == 1, 'vs', '@')
   )
 
-# API Pull
+  # API Pull
   API_KEY <- Sys.getenv("ODDS_API_KEY")
 
   if (API_KEY == "") {
@@ -289,7 +332,6 @@ tryCatch({
     "VAN"="#00205B", "VGK"="#B4975A", "WSH"="#C8102E", "WPG"="#041E42"
   )
 
-
   # Calculate Expected Saves
   daily_report_red_scaled <- daily_report_red_scaled %>%
   mutate(
@@ -316,10 +358,36 @@ tryCatch({
     ))
   )
 
+  # ==============================================================================
+  # Append Today's Predictions to Log
+  # ==============================================================================
+  if(nrow(daily_report_red_scaled) > 0) {
+    today_predictions <- daily_report_red_scaled %>%
+      mutate(
+        Date = today,
+        Team = team,
+        Opponent = opponent,
+        Goalie = goalie_name,
+        Prediction = pred_sog,
+        Saves_Line = vegas_saves,
+        Team_Total_Line = vegas_goals,
+        Actual_SOG = NA_real_
+      ) %>%
+      dplyr::select(Date, Team, Opponent, Goalie, Prediction, Saves_Line, Team_Total_Line, Actual_SOG) %>%
+      mutate(
+        Date = as.Date(Date), Team = as.character(Team), Opponent = as.character(Opponent),
+        Goalie = as.character(Goalie), Prediction = as.numeric(Prediction),
+        Saves_Line = as.numeric(Saves_Line), Team_Total_Line = as.numeric(Team_Total_Line),
+        Actual_SOG = as.numeric(Actual_SOG)
+      )
+    
+    historical_log <- historical_log %>%
+      rows_upsert(today_predictions, by = c("Date", "Team"))
+    
+    write_csv(historical_log, log_path)
+  }
 
-
-
-# --- HTML Output ---
+  # --- HTML Output ---
   if(nrow(daily_report_red_scaled) > 0) {
     
     away_df <- daily_report_red_scaled %>% filter(location == "@")
