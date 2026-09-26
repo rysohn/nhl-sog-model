@@ -23,11 +23,11 @@ if(file.exists("train_data.RData")) {
 
 # 2. Get Today's Date
 today <- as.Date(format(Sys.time(), tz = "America/New_York"))
-print(paste("Running model for:", "2026-03-12"))
+print(paste("Running model for:", today))
 
 tryCatch({
   # 3. Fetch Games
-  daily_reports <- get_daily_game_reports("2026-03-12")
+  daily_reports <- get_daily_game_reports(today)
   
   if(nrow(daily_reports) == 0) {
     stop("No games scheduled today.")
