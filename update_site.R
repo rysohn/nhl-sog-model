@@ -29,23 +29,34 @@ print(paste("Running model for:", today))
 # 2.5 Initialize and Update Predictions Log (Past Games)
 # ==============================================================================
 log_path <- "predictions_log.csv"
-log_cols <- c("Date", "Team", "Opponent", "Goalie", "Prediction", 
-               "Saves_Line", "Team_Total_Line", "Actual_SOG")
+
+log_col_spec <- cols(
+  Date = col_date(format = ""),
+  Team = col_character(),
+  Opponent = col_character(),
+  Goalie = col_character(),
+  Prediction = col_double(),
+  Saves_Line = col_double(),
+  Team_Total_Line = col_double(),
+  Actual_SOG = col_double()
+)
 
 if (!file.exists(log_path)) {
-  empty_log <- data.frame(matrix(ncol = length(log_cols), nrow = 0))
-  colnames(empty_log) <- log_cols
-  empty_log <- empty_log %>%
-    mutate(
-      Date = as.Date(Date), Team = as.character(Team), Opponent = as.character(Opponent),
-      Goalie = as.character(Goalie), Prediction = as.numeric(Prediction),
-      Saves_Line = as.numeric(Saves_Line), Team_Total_Line = as.numeric(Team_Total_Line),
-      Actual_SOG = as.numeric(Actual_SOG)
-    )
+  empty_log <- tibble(
+    Date = as.Date(character()),
+    Team = character(),
+    Opponent = character(),
+    Goalie = character(),
+    Prediction = numeric(),
+    Saves_Line = numeric(),
+    Team_Total_Line = numeric(),
+    Actual_SOG = numeric()
+  )
   write_csv(empty_log, log_path)
 }
 
-historical_log <- read_csv(log_path, show_col_types = FALSE)
+# Read using explicit col_types to ensure Date is always <date>, never <character>
+historical_log <- read_csv(log_path, col_types = log_col_spec)
 
 get_nhl_data <- function(date_str) {
   url <- paste0("https://api-web.nhle.com/v1/score/", date_str)
@@ -381,6 +392,7 @@ tryCatch({
         Actual_SOG = as.numeric(Actual_SOG)
       )
     
+    # historical_log is guaranteed Date type, so rows_upsert matches types cleanly
     historical_log <- historical_log %>%
       rows_upsert(today_predictions, by = c("Date", "Team"))
     
@@ -594,7 +606,6 @@ tryCatch({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Just track the mouse! CSS handles the gradient colors automatically now.
             card.style.setProperty('--mouse-x', `${x}px`);
             card.style.setProperty('--mouse-y', `${y}px`);
           });
