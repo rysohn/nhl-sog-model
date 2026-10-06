@@ -83,7 +83,7 @@ Date,Team,Opponent,Goalie,Prediction,Saves_Line,Team_Total_Line,Actual_SOG
 2026-10-06,NYI,NYR,Igor Shesterkin,28.7,22.5,2.5,NA
 2026-10-06,STL,CHI,Spencer Knight,26.5,21.5,NA,NA
 2026-10-06,VGK,SEA,Joey Daccord,29.2,25.5,2.5,NA
-2026-10-06,FLA,LAK,NA,27,NA,2.5,NA
+2026-10-06,FLA,LAK,Darcy Kuemper,27,23.5,2.5,NA
 2026-10-06,TOR,NSH,Juuse Saros,30.2,24.5,2.5,NA
 2026-10-06,MTL,CAR,Brandon Bussi,25.7,22.5,2.5,NA
 2026-10-06,DET,OTT,NA,25.9,NA,2.5,NA
@@ -92,4 +92,4 @@ Date,Team,Opponent,Goalie,Prediction,Saves_Line,Team_Total_Line,Actual_SOG
 2026-10-06,NYR,NYI,Semyon Varlamov,25.4,23.5,2.5,NA
 2026-10-06,CHI,STL,Joel Hofer,24.3,22.5,2.5,NA
 2026-10-06,SEA,VGK,NA,23.8,NA,2.5,NA
-2026-10-06,LAK,FLA,NA,27.1,NA,2.5,NA
+2026-10-06,LAK,FLA,Jacob Markstrom,27.1,22.5,2.5,NA
